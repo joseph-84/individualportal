@@ -1,0 +1,38 @@
+import type { Metadata } from "next";
+import { IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
+import { ThemeProvider } from "@/lib/theme-context";
+import "./globals.css";
+
+const plexSans = IBM_Plex_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-sans",
+  display: "swap",
+});
+
+const plexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-mono",
+  display: "swap",
+});
+
+export const metadata: Metadata = {
+  title: "Portal",
+  description: "개인 업무 자동화 포털",
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="ko" className={`${plexSans.variable} ${plexMono.variable}`}>
+      <body
+        style={{
+          background: "var(--bg)",
+          fontFamily: "var(--font-sans), system-ui, sans-serif",
+        }}
+      >
+        <ThemeProvider>{children}</ThemeProvider>
+      </body>
+    </html>
+  );
+}

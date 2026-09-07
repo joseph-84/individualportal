@@ -1,0 +1,150 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
+}
+
+[data-theme="light"] {
+  --bg: #f5f4f1;
+  --panel: #ffffff;
+  --panel2: #fbfaf8;
+  --panel3: #f0eeea;
+  --line: #e4e0da;
+  --line2: #eeebe6;
+  --ink: #1b1a18;
+  --ink2: #57534d;
+  --ink3: #8e8881;
+  --accent: #b0512e;
+  --accent-soft: #fbeade;
+  --on-accent: #ffffff;
+  --ok: #2f7350;
+  --ok-soft: #e7f1ea;
+  --warn: #8f6413;
+  --warn-soft: #f8f0dc;
+  --err: #a83326;
+  --err-soft: #fbe9e6;
+}
+
+[data-theme="dark"] {
+  --bg: #121110;
+  --panel: #1a1918;
+  --panel2: #201e1c;
+  --panel3: #292623;
+  --line: #332f2b;
+  --line2: #262320;
+  --ink: #f1eee9;
+  --ink2: #a9a29a;
+  --ink3: #7b746c;
+  --accent: #dd7a4f;
+  --accent-soft: #2c1d14;
+  --on-accent: #1a1008;
+  --ok: #64b98c;
+  --ok-soft: #16261d;
+  --warn: #d0a34f;
+  --warn-soft: #272014;
+  --err: #df7a6d;
+  --err-soft: #2b1716;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 8px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+.wiki-content h1 {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 24px 0 10px;
+}
+.wiki-content h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 22px 0 8px;
+}
+.wiki-content h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 18px 0 6px;
+}
+.wiki-content p {
+  margin: 0 0 12px;
+}
+.wiki-content ul,
+.wiki-content ol {
+  margin: 0 0 12px;
+  padding-left: 20px;
+}
+.wiki-content li {
+  margin-bottom: 4px;
+}
+.wiki-content code {
+  font-family: var(--font-mono), monospace;
+  font-size: 0.9em;
+  background: var(--panel3);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+.wiki-content pre {
+  background: var(--panel3);
+  padding: 12px 14px;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+.wiki-content pre code {
+  background: none;
+  padding: 0;
+}
+.wiki-content blockquote {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+  border-radius: 0 8px 8px 0;
+}
+.wiki-content table {
+  border-collapse: collapse;
+  margin: 0 0 16px;
+  font-size: 0.95em;
+}
+.wiki-content th,
+.wiki-content td {
+  border: 1px solid var(--line);
+  padding: 6px 10px;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}

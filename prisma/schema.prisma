@@ -1,0 +1,94 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Role {
+  id          String           @id @default(cuid())
+  key         String           @unique
+  name        String
+  description String?
+  isSystem    Boolean          @default(false)
+  users       User[]
+  permissions PagePermission[]
+  createdAt   DateTime         @default(now())
+}
+
+model PagePermission {
+  id     String @id @default(cuid())
+  roleId String
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  page   String
+  level  Int    @default(0)
+
+  @@unique([roleId, page])
+}
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String
+  name         String
+  active       Boolean    @default(true)
+  lastLoginAt  DateTime?
+  roleId       String
+  role         Role       @relation(fields: [roleId], references: [id])
+  todos        Todo[]
+  notes        Note[]
+  scriptRuns   ScriptRun[]
+  createdAt    DateTime   @default(now())
+}
+
+model Todo {
+  id        String    @id @default(cuid())
+  title     String
+  project   String?
+  tag       String?
+  repeat    String?
+  dueAt     DateTime?
+  done      Boolean   @default(false)
+  ownerId   String
+  owner     User      @relation(fields: [ownerId], references: [id])
+  createdAt DateTime  @default(now())
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  title     String
+  folder    String   @default("")
+  content   String
+  tags      String[]
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ScriptDef {
+  id          String      @id @default(cuid())
+  file        String      @unique
+  lang        String
+  description String
+  cron        String?
+  enabled     Boolean     @default(true)
+  runs        ScriptRun[]
+  createdAt   DateTime    @default(now())
+}
+
+model ScriptRun {
+  id          String    @id @default(cuid())
+  scriptId    String
+  script      ScriptDef @relation(fields: [scriptId], references: [id], onDelete: Cascade)
+  status      String
+  startedAt   DateTime  @default(now())
+  finishedAt  DateTime?
+  exitCode    Int?
+  log         String    @default("")
+  triggeredBy String?
+  userId      String?
+  user        User?     @relation(fields: [userId], references: [id])
+}
