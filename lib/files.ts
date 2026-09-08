@@ -90,6 +90,19 @@ export async function recentFiles(limit = 8, maxDepth = 3): Promise<FileEntry[]>
   return all.slice(0, limit);
 }
 
+export async function deleteEntry(relPath: string): Promise<void> {
+  if (!relPath) throw new UnsafePathError("루트 폴더는 삭제할 수 없습니다.");
+  const full = resolveSafePath(relPath);
+  await fs.rm(full, { recursive: true, force: true });
+}
+
+export async function renameOrMoveEntry(fromRelPath: string, toRelPath: string): Promise<void> {
+  const fromFull = resolveSafePath(fromRelPath);
+  const toFull = resolveSafePath(toRelPath);
+  await fs.mkdir(path.dirname(toFull), { recursive: true });
+  await fs.rename(fromFull, toFull);
+}
+
 export async function diskUsage(): Promise<{ used: number }> {
   let used = 0;
   async function walk(rel: string, depth: number) {

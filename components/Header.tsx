@@ -4,6 +4,8 @@ import { usePathname } from "next/navigation";
 import { TITLES } from "@/lib/constants";
 import { pathToPageKey } from "@/lib/routing";
 import { useTheme } from "@/lib/theme-context";
+import { HeaderSearch } from "./HeaderSearch";
+import { NotificationBell } from "./NotificationBell";
 
 export function Header({ roleName }: { roleName: string }) {
   const pathname = usePathname();
@@ -42,6 +44,7 @@ export function Header({ roleName }: { roleName: string }) {
         {subtitle}
       </div>
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+        <HeaderSearch />
         <div
           style={{
             fontSize: 11.5,
@@ -72,6 +75,7 @@ export function Header({ roleName }: { roleName: string }) {
         >
           {theme === "light" ? "☾" : "☀"}
         </button>
+        <NotificationBell />
       </div>
     </header>
   );

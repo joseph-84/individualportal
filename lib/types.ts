@@ -8,7 +8,8 @@ export type PageKey =
   | "automation"
   | "editor"
   | "users"
-  | "roles";
+  | "roles"
+  | "auditlog";
 
 export interface PageDef {
   key: PageKey;

@@ -3,7 +3,7 @@
 import { useTransition } from "react";
 import { runScriptAction } from "@/app/actions/scripts";
 
-export function ScriptRunButton({ scriptId, canRun }: { scriptId: string; canRun: boolean }) {
+export function ScriptRunButton({ scriptId, canRun, disabledLabel = "권한 없음" }: { scriptId: string; canRun: boolean; disabledLabel?: string }) {
   const [pending, startTransition] = useTransition();
   const active = canRun && !pending;
 
@@ -22,7 +22,7 @@ export function ScriptRunButton({ scriptId, canRun }: { scriptId: string; canRun
         cursor: active ? "pointer" : "not-allowed",
       }}
     >
-      {pending ? "실행중" : canRun ? "실행" : "권한 없음"}
+      {pending ? "실행중" : canRun ? "실행" : disabledLabel}
     </button>
   );
 }

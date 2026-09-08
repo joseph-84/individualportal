@@ -29,6 +29,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     include: { role: { include: { permissions: true } } },
   });
   if (!user || !user.active) return null;
+  if (user.tokenVersion !== payload.tv) return null; // invalidated by password change / "다른 기기 모두 로그아웃"
 
   const permissions: Record<string, number> = {};
   for (const p of user.role.permissions) permissions[p.page] = p.level;

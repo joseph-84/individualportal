@@ -150,26 +150,32 @@ export function Sidebar({ roleKey, roleName, userName, permissions }: Props) {
           gap: 9,
         }}
       >
-        <div
-          style={{
-            width: 26,
-            height: 26,
-            borderRadius: "50%",
-            background: "var(--panel3)",
-            color: "var(--ink2)",
-            display: "grid",
-            placeItems: "center",
-            fontSize: 10.5,
-            fontWeight: 600,
-            flex: "none",
-          }}
+        <button
+          onClick={() => router.push("/account")}
+          title="내 계정"
+          style={{ display: "flex", alignItems: "center", gap: 9, flex: 1, minWidth: 0, border: 0, background: "transparent", cursor: "pointer", textAlign: "left", padding: 0 }}
         >
-          {userName.slice(0, 2)}
-        </div>
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{userName}</div>
-          <div style={{ fontSize: 11, color: "var(--ink3)" }}>{roleName}</div>
-        </div>
+          <div
+            style={{
+              width: 26,
+              height: 26,
+              borderRadius: "50%",
+              background: "var(--panel3)",
+              color: "var(--ink2)",
+              display: "grid",
+              placeItems: "center",
+              fontSize: 10.5,
+              fontWeight: 600,
+              flex: "none",
+            }}
+          >
+            {userName.slice(0, 2)}
+          </div>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{userName}</div>
+            <div style={{ fontSize: 11, color: "var(--ink3)" }}>{roleName}</div>
+          </div>
+        </button>
         <form action={logoutAction}>
           <button
             type="submit"

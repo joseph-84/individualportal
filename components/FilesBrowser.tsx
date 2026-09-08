@@ -94,6 +94,40 @@ export function FilesBrowser({
     loadDir(dir);
   };
 
+  const deletePath = async (relPath: string, isDir: boolean) => {
+    if (!confirm(`"${relPath}"${isDir ? " 폴더" : ""}를 삭제할까요? 되돌릴 수 없습니다.`)) return;
+    await fetch("/api/files", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "delete", path: relPath }),
+    });
+    if (selected?.relPath === relPath) {
+      setSelected(null);
+      setPreview(null);
+    }
+    loadDir(dir);
+  };
+
+  const renameSelected = async () => {
+    if (!selected) return;
+    const newName = prompt("새 이름", selected.name);
+    if (!newName || newName === selected.name) return;
+    const to = dir ? `${dir}/${newName}` : newName;
+    const res = await fetch("/api/files", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "rename", from: selected.relPath, to }),
+    });
+    if (res.ok) {
+      setSelected(null);
+      setPreview(null);
+      loadDir(dir);
+    } else {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || "이름을 변경할 수 없습니다.");
+    }
+  };
+
   const crumbs = dir ? dir.split("/") : [];
 
   return (
@@ -112,14 +146,24 @@ export function FilesBrowser({
           </button>
         )}
         {folders.map((f) => (
-          <button
-            key={f.relPath}
-            onClick={() => loadDir(f.relPath)}
-            style={{ display: "flex", alignItems: "center", gap: 7, width: "100%", padding: "5px 8px", border: 0, borderRadius: 6, background: "transparent", color: "var(--ink2)", fontSize: 12.5, fontWeight: 450, cursor: "pointer", textAlign: "left" }}
-          >
-            <span style={{ fontSize: 11, opacity: 0.75 }}>▸</span>
-            <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
-          </button>
+          <div key={f.relPath} style={{ display: "flex", alignItems: "center" }}>
+            <button
+              onClick={() => loadDir(f.relPath)}
+              style={{ display: "flex", alignItems: "center", gap: 7, flex: 1, minWidth: 0, padding: "5px 8px", border: 0, borderRadius: 6, background: "transparent", color: "var(--ink2)", fontSize: 12.5, fontWeight: 450, cursor: "pointer", textAlign: "left" }}
+            >
+              <span style={{ fontSize: 11, opacity: 0.75 }}>▸</span>
+              <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
+            </button>
+            {canWrite && (
+              <button
+                onClick={() => deletePath(f.relPath, true)}
+                title="폴더 삭제"
+                style={{ flex: "none", width: 20, height: 20, border: 0, background: "transparent", color: "var(--ink3)", cursor: "pointer", fontSize: 12 }}
+              >
+                ✕
+              </button>
+            )}
+          </div>
         ))}
         <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--line2)", fontSize: 11.5, color: "var(--ink3)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
@@ -217,6 +261,22 @@ export function FilesBrowser({
               >
                 ↓ 다운로드
               </a>
+              {canWrite && (
+                <>
+                  <button
+                    onClick={renameSelected}
+                    style={{ height: 26, padding: "0 10px", border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel2)", color: "var(--ink2)", fontSize: 11.5, cursor: "pointer" }}
+                  >
+                    이름변경
+                  </button>
+                  <button
+                    onClick={() => deletePath(selected.relPath, false)}
+                    style={{ height: 26, padding: "0 10px", border: "1px solid var(--err)", borderRadius: 6, background: "var(--err-soft)", color: "var(--err)", fontSize: 11.5, cursor: "pointer" }}
+                  >
+                    삭제
+                  </button>
+                </>
+              )}
             </div>
             {!preview && <div style={{ padding: 20, fontSize: 12, color: "var(--ink3)" }}>불러오는 중...</div>}
             {preview?.kind === "text" && (

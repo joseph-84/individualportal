@@ -12,6 +12,7 @@ const BASE_MATRIX: Record<string, Record<string, number>> = {
   editor: { admin: 2, staff: 0, guest: 0, audit: 0 },
   users: { admin: 2, staff: 0, guest: 0, audit: 1 },
   roles: { admin: 2, staff: 0, guest: 0, audit: 0 },
+  auditlog: { admin: 2, staff: 0, guest: 0, audit: 1 },
 };
 
 const ROLE_DEFS = [
@@ -57,14 +58,16 @@ async function main() {
 
   const todoCount = await prisma.todo.count();
   if (todoCount === 0) {
+    const today = new Date();
+    const inDays = (n: number) => new Date(today.getFullYear(), today.getMonth(), today.getDate() + n, 10, 0);
     await prisma.todo.createMany({
       data: [
-        { title: "주간 리포트 초안 검토", project: "Ops", repeat: "매주 월", tag: "업무", ownerId: admin.id, done: true },
-        { title: "자동화 화이트리스트 정리", project: "Platform", tag: "업무", ownerId: admin.id },
-        { title: "백업 무결성 점검", project: "Infra", repeat: "매일", tag: "반복", ownerId: admin.id },
-        { title: "위키 온보딩 문서 갱신", project: "Docs", tag: "개인", ownerId: admin.id },
-        { title: "월간 비용 리포트 발송", project: "Ops", repeat: "매월 1일", tag: "반복", ownerId: admin.id },
-        { title: "접근 권한 정기 감사", project: "Security", repeat: "분기", tag: "마감", ownerId: admin.id },
+        { title: "주간 리포트 초안 검토", project: "Ops", repeat: "매주 월", tag: "업무", ownerId: admin.id, done: true, dueAt: inDays(0) },
+        { title: "자동화 화이트리스트 정리", project: "Platform", tag: "업무", ownerId: admin.id, dueAt: inDays(1) },
+        { title: "백업 무결성 점검", project: "Infra", repeat: "매일", tag: "반복", ownerId: admin.id, dueAt: inDays(0) },
+        { title: "위키 온보딩 문서 갱신", project: "Docs", tag: "개인", ownerId: admin.id, dueAt: inDays(3) },
+        { title: "월간 비용 리포트 발송", project: "Ops", repeat: "매월 1일", tag: "반복", ownerId: admin.id, dueAt: inDays(10) },
+        { title: "접근 권한 정기 감사", project: "Security", repeat: "분기", tag: "마감", ownerId: admin.id, dueAt: inDays(20) },
       ],
     });
   }
@@ -98,10 +101,10 @@ async function main() {
   if (scriptCount === 0) {
     await prisma.scriptDef.createMany({
       data: [
-        { file: "report_daily.py", lang: "PY", description: "일간 지표 집계 후 xlsx 생성", cron: "매일 09:00" },
-        { file: "index_wiki.py", lang: "PY", description: "위키 전문 색인 재생성", cron: "매시 정각" },
-        { file: "sync_drive.sh", lang: "SH", description: "드라이브 → /srv/data 동기화", cron: "매일 08:30" },
-        { file: "cleanup_tmp.sh", lang: "SH", description: "임시 파일 정리", cron: "매일 23:00" },
+        { file: "report_daily.py", lang: "PY", description: "일간 지표 집계 후 xlsx 생성", cron: "0 9 * * *" },
+        { file: "index_wiki.py", lang: "PY", description: "위키 전문 색인 재생성", cron: "0 * * * *" },
+        { file: "sync_drive.sh", lang: "SH", description: "드라이브 → /srv/data 동기화", cron: "30 8 * * *" },
+        { file: "cleanup_tmp.sh", lang: "SH", description: "임시 파일 정리", cron: "0 23 * * *" },
       ],
     });
   }
