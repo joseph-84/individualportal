@@ -20,6 +20,10 @@ function CreateNoteForm({ onDone }: { onDone: () => void }) {
       <input name="title" placeholder="제목" required style={{ height: 26, padding: "0 8px", border: "1px solid var(--line)", borderRadius: 5, background: "var(--panel)", color: "var(--ink)", fontSize: 12 }} />
       <input name="folder" placeholder="폴더 (예: Ops / 배포)" style={{ height: 26, padding: "0 8px", border: "1px solid var(--line)", borderRadius: 5, background: "var(--panel)", color: "var(--ink)", fontSize: 12 }} />
       <input name="tags" placeholder="태그 (쉼표로 구분)" style={{ height: 26, padding: "0 8px", border: "1px solid var(--line)", borderRadius: 5, background: "var(--panel)", color: "var(--ink)", fontSize: 12 }} />
+      <select name="format" defaultValue="md" style={{ height: 26, border: "1px solid var(--line)", borderRadius: 5, background: "var(--panel)", color: "var(--ink)", fontSize: 12 }}>
+        <option value="md">마크다운 (.md)</option>
+        <option value="html">HTML (.html)</option>
+      </select>
       <div style={{ display: "flex", gap: 5 }}>
         <button type="submit" disabled={pending} style={{ flex: 1, height: 26, border: 0, borderRadius: 5, background: "var(--accent)", color: "var(--on-accent)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
           {pending ? "생성 중..." : "생성"}

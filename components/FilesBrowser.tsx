@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useState, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { ShareDialog } from "./ShareDialog";
 
 interface FileEntry {
   name: string;
@@ -11,8 +13,14 @@ interface FileEntry {
   ext: string;
 }
 
+const KB_ROOT = "__kb__";
+function isKb(p: string) {
+  return p === KB_ROOT || p.startsWith(KB_ROOT + "/");
+}
+
 const EXT_COLOR: Record<string, [string, string]> = {
   MD: ["var(--accent-soft)", "var(--accent)"],
+  HTML: ["var(--accent-soft)", "var(--accent)"],
   PNG: ["var(--ok-soft)", "var(--ok)"],
   JPG: ["var(--ok-soft)", "var(--ok)"],
   PDF: ["var(--err-soft)", "var(--err)"],
@@ -38,12 +46,17 @@ export function FilesBrowser({
   usedBytes: number;
   canWrite: boolean;
 }) {
+  const router = useRouter();
   const [dir, setDir] = useState(initialDir);
   const [entries, setEntries] = useState(initialEntries);
   const [selected, setSelected] = useState<FileEntry | null>(null);
   const [preview, setPreview] = useState<{ kind: string; text?: string } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+
+  const inKb = isKb(dir);
+  const writable = canWrite && !inKb;
 
   const loadDir = async (nextDir: string) => {
     setLoading(true);
@@ -151,10 +164,10 @@ export function FilesBrowser({
               onClick={() => loadDir(f.relPath)}
               style={{ display: "flex", alignItems: "center", gap: 7, flex: 1, minWidth: 0, padding: "5px 8px", border: 0, borderRadius: 6, background: "transparent", color: "var(--ink2)", fontSize: 12.5, fontWeight: 450, cursor: "pointer", textAlign: "left" }}
             >
-              <span style={{ fontSize: 11, opacity: 0.75 }}>▸</span>
+              <span style={{ fontSize: 11, opacity: 0.75 }}>{isKb(f.relPath) ? "📚" : "▸"}</span>
               <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
             </button>
-            {canWrite && (
+            {canWrite && !isKb(f.relPath) && (
               <button
                 onClick={() => deletePath(f.relPath, true)}
                 title="폴더 삭제"
@@ -176,9 +189,9 @@ export function FilesBrowser({
       <section style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 10, overflow: "hidden" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderBottom: "1px solid var(--line)" }}>
           <div style={{ fontFamily: "var(--font-mono), monospace", fontSize: 11.5, color: "var(--ink3)", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            /{dir}
+            {inKb ? "지식베이스 (읽기 전용 — 위키에서 편집)" : `/${dir}`}
           </div>
-          {canWrite && (
+          {writable && (
             <>
               <input ref={fileInput} type="file" hidden onChange={(e) => upload(e.target.files)} />
               <button
@@ -242,7 +255,7 @@ export function FilesBrowser({
                 </span>
                 <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
               </span>
-              <span style={{ fontFamily: "var(--font-mono), monospace", fontSize: 11.5, color: "var(--ink2)" }}>{fmtSize(f.size)}</span>
+              <span style={{ fontFamily: "var(--font-mono), monospace", fontSize: 11.5, color: "var(--ink2)" }}>{inKb ? "" : fmtSize(f.size)}</span>
               <span style={{ fontFamily: "var(--font-mono), monospace", fontSize: 11.5, color: "var(--ink3)" }}>{new Date(f.mtime).toLocaleDateString("ko-KR")}</span>
             </button>
           );
@@ -255,14 +268,22 @@ export function FilesBrowser({
           <>
             <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderBottom: "1px solid var(--line)" }}>
               <div style={{ fontSize: 12.5, fontWeight: 600, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{selected.name}</div>
-              <a
-                href={`/api/files/content?path=${encodeURIComponent(selected.relPath)}&download=1`}
-                style={{ height: 26, padding: "0 10px", border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel2)", color: "var(--ink2)", fontSize: 11.5, display: "flex", alignItems: "center", textDecoration: "none" }}
-              >
-                ↓ 다운로드
-              </a>
-              {canWrite && (
+              {!inKb && (
+                <a
+                  href={`/api/files/content?path=${encodeURIComponent(selected.relPath)}&download=1`}
+                  style={{ height: 26, padding: "0 10px", border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel2)", color: "var(--ink2)", fontSize: 11.5, display: "flex", alignItems: "center", textDecoration: "none" }}
+                >
+                  ↓ 다운로드
+                </a>
+              )}
+              {writable && (
                 <>
+                  <button
+                    onClick={() => setSharing(true)}
+                    style={{ height: 26, padding: "0 10px", border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel2)", color: "var(--ink2)", fontSize: 11.5, cursor: "pointer" }}
+                  >
+                    공유
+                  </button>
                   <button
                     onClick={renameSelected}
                     style={{ height: 26, padding: "0 10px", border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel2)", color: "var(--ink2)", fontSize: 11.5, cursor: "pointer" }}
@@ -276,6 +297,14 @@ export function FilesBrowser({
                     삭제
                   </button>
                 </>
+              )}
+              {inKb && (
+                <button
+                  onClick={() => router.push("/wiki")}
+                  style={{ height: 26, padding: "0 10px", border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel2)", color: "var(--ink2)", fontSize: 11.5, cursor: "pointer" }}
+                >
+                  위키에서 열기
+                </button>
               )}
             </div>
             {!preview && <div style={{ padding: 20, fontSize: 12, color: "var(--ink3)" }}>불러오는 중...</div>}
@@ -295,24 +324,27 @@ export function FilesBrowser({
               </div>
             )}
             {preview?.kind === "binary" && <div style={{ padding: 20, fontSize: 12, color: "var(--ink3)" }}>미리보기를 지원하지 않는 파일 형식입니다.</div>}
-            <div style={{ borderTop: "1px solid var(--line2)", padding: "12px 14px" }}>
-              <div style={{ fontFamily: "var(--font-mono), monospace", fontSize: 10, fontWeight: 600, letterSpacing: ".1em", color: "var(--ink3)", marginBottom: 8 }}>
-                METADATA
-              </div>
-              {[
-                { k: "경로", v: `/${selected.relPath}` },
-                { k: "크기", v: fmtSize(selected.size) },
-                { k: "수정", v: new Date(selected.mtime).toLocaleString("ko-KR") },
-              ].map((m) => (
-                <div key={m.k} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "3px 0", fontSize: 12 }}>
-                  <span style={{ color: "var(--ink3)" }}>{m.k}</span>
-                  <span style={{ fontFamily: "var(--font-mono), monospace", color: "var(--ink2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.v}</span>
+            {!inKb && (
+              <div style={{ borderTop: "1px solid var(--line2)", padding: "12px 14px" }}>
+                <div style={{ fontFamily: "var(--font-mono), monospace", fontSize: 10, fontWeight: 600, letterSpacing: ".1em", color: "var(--ink3)", marginBottom: 8 }}>
+                  METADATA
                 </div>
-              ))}
-            </div>
+                {[
+                  { k: "경로", v: `/${selected.relPath}` },
+                  { k: "크기", v: fmtSize(selected.size) },
+                  { k: "수정", v: new Date(selected.mtime).toLocaleString("ko-KR") },
+                ].map((m) => (
+                  <div key={m.k} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "3px 0", fontSize: 12 }}>
+                    <span style={{ color: "var(--ink3)" }}>{m.k}</span>
+                    <span style={{ fontFamily: "var(--font-mono), monospace", color: "var(--ink2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.v}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </>
         )}
       </section>
+      {sharing && selected && <ShareDialog relPath={selected.relPath} onClose={() => setSharing(false)} />}
     </div>
   );
 }

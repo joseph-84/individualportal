@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { apiRequirePerm } from "@/lib/guard";
 import { listDir, ensureDir, deleteEntry, renameOrMoveEntry, UnsafePathError } from "@/lib/files";
+import { isKbPath, listKbEntries, kbRootEntry } from "@/lib/kb-files";
 import { writeAudit } from "@/lib/audit";
 
 export async function GET(req: NextRequest) {
@@ -9,7 +10,12 @@ export async function GET(req: NextRequest) {
 
   const dir = req.nextUrl.searchParams.get("dir") || "";
   try {
+    if (isKbPath(dir)) {
+      const entries = await listKbEntries(dir);
+      return NextResponse.json({ dir, entries, readOnly: true });
+    }
     const entries = await listDir(dir);
+    if (dir === "") entries.unshift(kbRootEntry);
     return NextResponse.json({ dir, entries });
   } catch (e) {
     if (e instanceof UnsafePathError) return NextResponse.json({ error: e.message }, { status: 400 });
@@ -24,6 +30,9 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   if (!body || typeof body.action !== "string") {
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
+  }
+  if ((typeof body.dir === "string" && isKbPath(body.dir)) || (typeof body.path === "string" && isKbPath(body.path))) {
+    return NextResponse.json({ error: `지식베이스 문서는 위키에서 관리하세요 (읽기 전용).` }, { status: 400 });
   }
 
   try {

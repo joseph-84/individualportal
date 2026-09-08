@@ -21,13 +21,15 @@ export async function createNoteAction(_prev: CreateNoteState, formData: FormDat
   const title = String(formData.get("title") || "").trim();
   const folder = String(formData.get("folder") || "").trim();
   const tagsRaw = String(formData.get("tags") || "").trim();
+  const format = String(formData.get("format") || "md") === "html" ? "html" : "md";
   if (!title) return { error: "제목을 입력하세요." };
 
   const tags = tagsRaw ? tagsRaw.split(",").map((t) => t.trim()).filter(Boolean) : [];
+  const content = format === "html" ? `<h1>${title}</h1>\n<p></p>\n` : `# ${title}\n\n`;
   const note = await prisma.note.create({
-    data: { title, folder, tags, content: `# ${title}\n\n`, ownerId: user.id },
+    data: { title, folder, tags, format, content, ownerId: user.id },
   });
-  await writeAudit(user, "note.create", title, { folder });
+  await writeAudit(user, "note.create", title, { folder, format });
   revalidatePath("/wiki");
   redirect(`/wiki?id=${note.id}`);
 }
