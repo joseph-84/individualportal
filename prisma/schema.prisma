@@ -36,7 +36,7 @@ model Todo {
   repeat      String?
   dueAt       DateTime?
   done        Boolean   @default(false)
-  priority    Int       @default(2) // 1 = high, 2 = medium, 3 = low
+  order       Float     @default(0) // manual drag-and-drop order among siblings (same parentId)
   ownerId     String
   owner       User      @relation(fields: [ownerId], references: [id])
   parentId    String?
@@ -121,6 +121,18 @@ model ApiToken {
   revoked     Boolean   @default(false)
   lastUsedAt  DateTime?
   createdAt   DateTime  @default(now())
+}
+
+// Single row per external service the user has connected (Google Calendar, etc).
+model Integration {
+  id           String    @id @default(cuid())
+  provider     String    @unique // "google_calendar"
+  accessToken  String
+  refreshToken String?
+  expiresAt    DateTime?
+  accountEmail String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 }
 
 model AuditLog {

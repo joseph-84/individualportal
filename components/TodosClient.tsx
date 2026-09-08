@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition, useActionState } from "react";
-import { createTodoAction, deleteTodoAction, editTodoAction, setTodoPriorityAction, type EditTodoState } from "@/app/actions/todos";
+import { createTodoAction, deleteTodoAction, editTodoAction, reorderTodoAction, type EditTodoState } from "@/app/actions/todos";
 import { TodoCheckbox } from "./TodoCheckbox";
 
 interface TodoItem {
@@ -12,7 +12,7 @@ interface TodoItem {
   repeat: string | null;
   tag: string;
   done: boolean;
-  priority: number;
+  order: number;
   parentId: string | null;
   dueAt: string | null;
 }
@@ -24,12 +24,6 @@ const CHIP: Record<string, [string, string]> = {
   마감: ["var(--err-soft)", "var(--err)"],
 };
 
-const PRIORITY = {
-  1: { label: "높음", color: "var(--err)" },
-  2: { label: "보통", color: "var(--ink3)" },
-  3: { label: "낮음", color: "var(--ok)" },
-} as const;
-
 function seg(on: boolean): [string, string] {
   return on ? ["var(--panel)", "var(--ink)"] : ["transparent", "var(--ink2)"];
 }
@@ -39,26 +33,6 @@ type Filter = (typeof FILTERS)[number];
 
 function isSameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-}
-
-function PriorityDot({ id, priority, canWrite }: { id: string; priority: number; canWrite: boolean }) {
-  const [pending, startTransition] = useTransition();
-  const cycle = () => {
-    if (!canWrite) return;
-    const next = priority === 1 ? 2 : priority === 2 ? 3 : 1;
-    startTransition(() => setTodoPriorityAction(id, next));
-  };
-  const p = PRIORITY[priority as 1 | 2 | 3] || PRIORITY[2];
-  return (
-    <button
-      onClick={cycle}
-      disabled={!canWrite || pending}
-      title={`우선순위: ${p.label} (클릭하여 변경)`}
-      style={{ width: 20, height: 20, flex: "none", border: "1px solid var(--line)", borderRadius: 5, background: "var(--panel)", color: p.color, fontSize: 9.5, fontWeight: 700, cursor: canWrite ? "pointer" : "default", opacity: pending ? 0.5 : 1 }}
-    >
-      {priority === 1 ? "!" : priority === 3 ? "↓" : "–"}
-    </button>
-  );
 }
 
 const initialEdit: EditTodoState = {};
@@ -91,11 +65,6 @@ function EditTodoForm({ todo, onDone }: { todo: TodoItem; onDone: () => void }) 
           <option value="개인">개인</option>
           <option value="마감">마감</option>
         </select>
-        <select name="priority" defaultValue={String(todo.priority)} style={{ height: 30, border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel)", color: "var(--ink)", fontSize: 12.5 }}>
-          <option value="1">우선순위: 높음</option>
-          <option value="2">우선순위: 보통</option>
-          <option value="3">우선순위: 낮음</option>
-        </select>
       </div>
       {state.error && <div style={{ fontSize: 12, color: "var(--err)" }}>{state.error}</div>}
       <div style={{ display: "flex", gap: 6 }}>
@@ -110,6 +79,11 @@ function EditTodoForm({ todo, onDone }: { todo: TodoItem; onDone: () => void }) 
   );
 }
 
+interface DragState {
+  id: string;
+  parentId: string | null;
+}
+
 function TodoRow({
   todo,
   depth,
@@ -119,6 +93,11 @@ function TodoRow({
   setEditingId,
   addingParentId,
   setAddingParentId,
+  dragged,
+  setDragged,
+  dropTarget,
+  setDropTarget,
+  onDrop,
 }: {
   todo: TodoItem;
   depth: number;
@@ -128,6 +107,11 @@ function TodoRow({
   setEditingId: (id: string | null) => void;
   addingParentId: string | null;
   setAddingParentId: (id: string | null) => void;
+  dragged: DragState | null;
+  setDragged: (d: DragState | null) => void;
+  dropTarget: { id: string; pos: "before" | "after" } | null;
+  setDropTarget: (d: { id: string; pos: "before" | "after" } | null) => void;
+  onDrop: (targetId: string, pos: "before" | "after") => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [, startTransition] = useTransition();
@@ -136,9 +120,51 @@ function TodoRow({
   const adding = addingParentId === todo.id;
   const children = byParent.get(todo.id) || [];
 
+  const canAcceptDrop = canWrite && dragged && dragged.parentId === (todo.parentId ?? null) && dragged.id !== todo.id;
+  const showTopLine = canAcceptDrop && dropTarget?.id === todo.id && dropTarget.pos === "before";
+  const showBottomLine = canAcceptDrop && dropTarget?.id === todo.id && dropTarget.pos === "after";
+
   return (
     <div style={{ borderBottom: depth === 0 ? "1px solid var(--line2)" : "none" }}>
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "9px 15px", paddingLeft: 15 + depth * 22 }}>
+      <div
+        draggable={canWrite}
+        onDragStart={(e) => {
+          e.dataTransfer.effectAllowed = "move";
+          setDragged({ id: todo.id, parentId: todo.parentId ?? null });
+        }}
+        onDragEnd={() => {
+          setDragged(null);
+          setDropTarget(null);
+        }}
+        onDragOver={(e) => {
+          if (!canAcceptDrop) return;
+          e.preventDefault();
+          const rect = e.currentTarget.getBoundingClientRect();
+          const pos = e.clientY - rect.top < rect.height / 2 ? "before" : "after";
+          if (dropTarget?.id !== todo.id || dropTarget.pos !== pos) setDropTarget({ id: todo.id, pos });
+        }}
+        onDrop={(e) => {
+          if (!canAcceptDrop || !dropTarget) return;
+          e.preventDefault();
+          onDrop(todo.id, dropTarget.pos);
+        }}
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 8,
+          padding: "9px 15px",
+          paddingLeft: 15 + depth * 22,
+          borderTop: showTopLine ? "2px solid var(--accent)" : "2px solid transparent",
+          borderBottom: showBottomLine ? "2px solid var(--accent)" : undefined,
+          opacity: dragged?.id === todo.id ? 0.4 : 1,
+          cursor: canWrite ? "grab" : "default",
+        }}
+      >
+        {canWrite && (
+          <span style={{ width: 10, flex: "none", color: "var(--ink3)", fontSize: 11, marginTop: 2, cursor: "grab" }} title="드래그해서 순서 변경">
+            ⠿
+          </span>
+        )}
         {children.length > 0 ? (
           <button onClick={() => setCollapsed((v) => !v)} style={{ width: 16, height: 20, border: 0, background: "transparent", color: "var(--ink3)", cursor: "pointer", fontSize: 10, flex: "none" }}>
             {collapsed ? "▸" : "▾"}
@@ -148,9 +174,6 @@ function TodoRow({
         )}
         <div style={{ marginTop: 2 }}>
           <TodoCheckbox id={todo.id} done={todo.done} canWrite={canWrite} />
-        </div>
-        <div style={{ marginTop: 1 }}>
-          <PriorityDot id={todo.id} priority={todo.priority} canWrite={canWrite} />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, color: todo.done ? "var(--ink3)" : "var(--ink)", textDecoration: todo.done ? "line-through" : "none" }}>{todo.title}</div>
@@ -207,18 +230,43 @@ function TodoRow({
 
       {!collapsed &&
         children.map((c) => (
-          <TodoRow key={c.id} todo={c} depth={depth + 1} byParent={byParent} canWrite={canWrite} editingId={editingId} setEditingId={setEditingId} addingParentId={addingParentId} setAddingParentId={setAddingParentId} />
+          <TodoRow
+            key={c.id}
+            todo={c}
+            depth={depth + 1}
+            byParent={byParent}
+            canWrite={canWrite}
+            editingId={editingId}
+            setEditingId={setEditingId}
+            addingParentId={addingParentId}
+            setAddingParentId={setAddingParentId}
+            dragged={dragged}
+            setDragged={setDragged}
+            dropTarget={dropTarget}
+            setDropTarget={setDropTarget}
+            onDrop={onDrop}
+          />
         ))}
     </div>
   );
 }
 
-export function TodosClient({ todos, canWrite }: { todos: TodoItem[]; canWrite: boolean }) {
+interface GoogleCalendarEvent {
+  id: string;
+  title: string;
+  start: string;
+  allDay: boolean;
+  htmlLink: string;
+}
+
+export function TodosClient({ todos, canWrite, googleEvents = [] }: { todos: TodoItem[]; canWrite: boolean; googleEvents?: GoogleCalendarEvent[] }) {
   const [view, setView] = useState<"list" | "cal">("list");
   const [showForm, setShowForm] = useState(false);
   const [filter, setFilter] = useState<Filter>("전체");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [addingParentId, setAddingParentId] = useState<string | null>(null);
+  const [dragged, setDragged] = useState<DragState | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ id: string; pos: "before" | "after" } | null>(null);
   const [, startTransition] = useTransition();
   const [listBg, listFg] = seg(view === "list");
   const [calBg, calFg] = seg(view === "cal");
@@ -231,6 +279,28 @@ export function TodosClient({ todos, canWrite }: { todos: TodoItem[]; canWrite: 
     }
     return m;
   }, [todos]);
+
+  const handleDrop = (targetId: string, pos: "before" | "after") => {
+    if (!dragged) return;
+    const groupKey = dragged.parentId || "__root__";
+    const list = byParent.get(groupKey) || [];
+    const idx = list.findIndex((t) => t.id === targetId);
+    if (idx === -1) return;
+    let beforeOrder: number | null;
+    let afterOrder: number | null;
+    if (pos === "before") {
+      afterOrder = list[idx].order;
+      const prev = list[idx - 1];
+      beforeOrder = prev && prev.id !== dragged.id ? prev.order : idx > 0 ? list[idx - 2]?.order ?? null : null;
+    } else {
+      beforeOrder = list[idx].order;
+      const next = list[idx + 1];
+      afterOrder = next && next.id !== dragged.id ? next.order : null;
+    }
+    startTransition(() => reorderTodoAction(dragged.id, beforeOrder, afterOrder));
+    setDragged(null);
+    setDropTarget(null);
+  };
 
   const filteredRoots = useMemo(() => {
     const roots = byParent.get("__root__") || [];
@@ -263,13 +333,23 @@ export function TodosClient({ todos, canWrite }: { todos: TodoItem[]; canWrite: 
       eventsByDay.set(d.getDate(), list);
     }
   }
+  const googleByDay = new Map<number, GoogleCalendarEvent[]>();
+  for (const e of googleEvents) {
+    const d = new Date(e.start);
+    if (d.getFullYear() === year && d.getMonth() === month) {
+      const list = googleByDay.get(d.getDate()) || [];
+      list.push(e);
+      googleByDay.set(d.getDate(), list);
+    }
+  }
   const calDays = [];
   for (let i = -firstWeekday; i < daysInMonth + (7 - ((firstWeekday + daysInMonth) % 7 || 7)); i++) {
     const day = i + 1;
     const inMonth = day >= 1 && day <= daysInMonth;
     const today = inMonth && day === now.getDate();
     const evs = inMonth ? eventsByDay.get(day) || [] : [];
-    calDays.push({ day, inMonth, today, evs });
+    const gevs = inMonth ? googleByDay.get(day) || [] : [];
+    calDays.push({ day, inMonth, today, evs, gevs });
   }
 
   return (
@@ -325,11 +405,6 @@ export function TodosClient({ todos, canWrite }: { todos: TodoItem[]; canWrite: 
             <option value="개인">개인</option>
             <option value="마감">마감</option>
           </select>
-          <select name="priority" defaultValue="2" style={{ height: 32, border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel2)", color: "var(--ink)", fontSize: 12.5 }}>
-            <option value="1">우선순위: 높음</option>
-            <option value="2">우선순위: 보통</option>
-            <option value="3">우선순위: 낮음</option>
-          </select>
           <textarea
             name="description"
             placeholder="설명 (선택)"
@@ -356,6 +431,11 @@ export function TodosClient({ todos, canWrite }: { todos: TodoItem[]; canWrite: 
               setEditingId={setEditingId}
               addingParentId={addingParentId}
               setAddingParentId={setAddingParentId}
+              dragged={dragged}
+              setDragged={setDragged}
+              dropTarget={dropTarget}
+              setDropTarget={setDropTarget}
+              onDrop={handleDrop}
             />
           ))}
         </div>
@@ -393,6 +473,29 @@ export function TodosClient({ todos, canWrite }: { todos: TodoItem[]; canWrite: 
                     </div>
                   );
                 })}
+                {d.gevs.map((e) => (
+                  <a
+                    key={e.id}
+                    href={e.htmlLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Google Calendar"
+                    style={{
+                      display: "block",
+                      padding: "2px 5px",
+                      marginBottom: 3,
+                      borderRadius: 4,
+                      background: "var(--panel3)",
+                      color: "var(--ink2)",
+                      fontSize: 10.5,
+                      overflow: "hidden",
+                      whiteSpace: "nowrap",
+                      textDecoration: "none",
+                    }}
+                  >
+                    📅 {e.title}
+                  </a>
+                ))}
               </div>
             ))}
           </div>
