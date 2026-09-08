@@ -9,5 +9,5 @@ export default async function AccountPage() {
   const host = h.get("x-forwarded-host") || h.get("host") || "localhost";
   const mcpUrl = `${proto}://${host}/mcp`;
 
-  return <AccountClient name={user.name} email={user.email} roleName={user.role.name} mcpUrl={mcpUrl} />;
+  return <AccountClient name={user.name} email={user.email} mcpUrl={mcpUrl} />;
 }

@@ -1,5 +1,4 @@
 import { pageAccess } from "@/lib/guard";
-import { Denied } from "@/components/Denied";
 import { prisma } from "@/lib/prisma";
 import { recentFiles } from "@/lib/files";
 import { TodoCheckbox } from "@/components/TodoCheckbox";
@@ -20,7 +19,6 @@ const PRIORITY_COLOR: Record<number, string> = { 1: "var(--err)", 2: "var(--ink3
 
 export default async function DashboardPage() {
   const { user, level } = await pageAccess("dashboard");
-  if (level === 0) return <Denied roleName={user.role.name} />;
 
   const [todos, incompleteCount, notes, runs, weekRuns, errRuns, files] = await Promise.all([
     prisma.todo.findMany({ where: { parentId: null }, orderBy: [{ priority: "asc" }, { createdAt: "asc" }], take: 5 }),

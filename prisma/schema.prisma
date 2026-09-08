@@ -7,27 +7,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Role {
-  id          String           @id @default(cuid())
-  key         String           @unique
-  name        String
-  description String?
-  isSystem    Boolean          @default(false)
-  users       User[]
-  permissions PagePermission[]
-  createdAt   DateTime         @default(now())
-}
-
-model PagePermission {
-  id     String @id @default(cuid())
-  roleId String
-  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  page   String
-  level  Int    @default(0)
-
-  @@unique([roleId, page])
-}
-
+// Single-user portal: no roles/permissions. Being logged in grants full access.
 model User {
   id               String      @id @default(cuid())
   email            String      @unique
@@ -38,8 +18,6 @@ model User {
   failedLoginCount Int         @default(0)
   lockedUntil      DateTime?
   tokenVersion     Int         @default(0)
-  roleId           String
-  role             Role        @relation(fields: [roleId], references: [id])
   todos            Todo[]
   notes            Note[]
   scriptRuns       ScriptRun[]
@@ -106,17 +84,31 @@ model ScriptRun {
 }
 
 model ShareLink {
-  id             String    @id @default(cuid())
-  token          String    @unique
+  id             String     @id @default(cuid())
+  token          String     @unique
   relPath        String
-  scope          String // "members" | "public"
+  scope          String // "email_otp" | "public"
+  email          String? // required when scope = "email_otp"
   createdById    String
-  createdBy      User      @relation(fields: [createdById], references: [id])
-  revoked        Boolean   @default(false)
+  createdBy      User       @relation(fields: [createdById], references: [id])
+  revoked        Boolean    @default(false)
   lastAccessedAt DateTime?
-  createdAt      DateTime  @default(now())
+  createdAt      DateTime   @default(now())
+  otps           ShareOtp[]
 
   @@index([relPath])
+}
+
+model ShareOtp {
+  id          String    @id @default(cuid())
+  shareLinkId String
+  shareLink   ShareLink @relation(fields: [shareLinkId], references: [id], onDelete: Cascade)
+  code        String
+  consumed    Boolean   @default(false)
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+
+  @@index([shareLinkId])
 }
 
 model ApiToken {

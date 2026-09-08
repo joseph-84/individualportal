@@ -165,14 +165,13 @@ function ApiTokenSection({ mcpUrl }: { mcpUrl: string }) {
   );
 }
 
-export function AccountClient({ name, email, roleName, mcpUrl }: { name: string; email: string; roleName: string; mcpUrl: string }) {
+export function AccountClient({ name, email, mcpUrl }: { name: string; email: string; mcpUrl: string }) {
   return (
     <div style={{ display: "grid", gap: 12, maxWidth: 560 }}>
       <section style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 10, padding: "16px 18px" }}>
         <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>내 계정</div>
         <div style={{ fontSize: 12.5, color: "var(--ink2)", marginBottom: 4 }}>{name}</div>
-        <div style={{ fontSize: 12, color: "var(--ink3)", marginBottom: 4 }}>{email}</div>
-        <div style={{ fontSize: 12, color: "var(--ink3)" }}>역할: {roleName}</div>
+        <div style={{ fontSize: 12, color: "var(--ink3)" }}>{email}</div>
       </section>
 
       <PasswordSection />

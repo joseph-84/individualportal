@@ -1,5 +1,4 @@
 import { pageAccess } from "@/lib/guard";
-import { Denied } from "@/components/Denied";
 import { prisma } from "@/lib/prisma";
 import { renderNote } from "@/lib/markdown";
 import { WikiEditor } from "@/components/WikiEditor";
@@ -7,7 +6,6 @@ import { WikiSidebar } from "@/components/WikiSidebar";
 
 export default async function WikiPage({ searchParams }: { searchParams: Promise<{ id?: string }> }) {
   const { user, level } = await pageAccess("wiki");
-  if (level === 0) return <Denied roleName={user.role.name} />;
 
   const { id } = await searchParams;
   const notes = await prisma.note.findMany({ orderBy: [{ folder: "asc" }, { title: "asc" }] });

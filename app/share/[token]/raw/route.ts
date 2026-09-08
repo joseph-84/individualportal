@@ -1,8 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import path from "node:path";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/session";
-import { readFileBuffer, previewKind, UnsafePathError } from "@/lib/files";
+import { readFileBuffer, UnsafePathError } from "@/lib/files";
+import { shareAccessCookieName, verifyShareAccessToken } from "@/lib/share-otp-auth";
 
 const MIME: Record<string, string> = {
   PNG: "image/png",
@@ -25,12 +25,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
     return new NextResponse("이 공유 링크는 더 이상 유효하지 않습니다.", { status: 404 });
   }
 
-  if (link.scope === "members") {
-    const user = await getCurrentUser();
-    if (!user) {
-      const loginUrl = new URL("/", req.url);
-      loginUrl.searchParams.set("next", req.nextUrl.pathname);
-      return NextResponse.redirect(loginUrl);
+  if (link.scope === "email_otp") {
+    const cookieVal = req.cookies.get(shareAccessCookieName(token))?.value;
+    const okAccess = cookieVal ? await verifyShareAccessToken(cookieVal, token) : false;
+    if (!okAccess) {
+      return NextResponse.redirect(new URL(`/share/${token}`, req.url));
     }
   }
 
@@ -39,11 +38,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
     prisma.shareLink.update({ where: { id: link.id }, data: { lastAccessedAt: new Date() } }).catch(() => {});
 
     const ext = path.extname(link.relPath).replace(".", "").toUpperCase();
-    const kind = previewKind(ext);
     const download = req.nextUrl.searchParams.get("download") === "1";
     const filename = path.basename(link.relPath);
 
-    if (download || kind === "binary") {
+    if (download) {
       return new NextResponse(new Uint8Array(buf), {
         headers: {
           "Content-Type": "application/octet-stream",

@@ -3,44 +3,7 @@ import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
-const BASE_MATRIX: Record<string, Record<string, number>> = {
-  dashboard: { admin: 2, staff: 2, guest: 1, audit: 1 },
-  todos: { admin: 2, staff: 2, guest: 0, audit: 0 },
-  wiki: { admin: 2, staff: 2, guest: 1, audit: 1 },
-  files: { admin: 2, staff: 2, guest: 1, audit: 1 },
-  automation: { admin: 2, staff: 1, guest: 0, audit: 1 },
-  editor: { admin: 2, staff: 0, guest: 0, audit: 0 },
-  users: { admin: 2, staff: 0, guest: 0, audit: 1 },
-  roles: { admin: 2, staff: 0, guest: 0, audit: 0 },
-  auditlog: { admin: 2, staff: 0, guest: 0, audit: 1 },
-};
-
-const ROLE_DEFS = [
-  { key: "admin", name: "관리자", description: "전체 페이지 read/write", isSystem: true },
-  { key: "staff", name: "일반 사용자", description: "업무 페이지 write, 자동화 read", isSystem: false },
-  { key: "audit", name: "감사", description: "감사 목적 읽기 전용", isSystem: false },
-  { key: "guest", name: "게스트", description: "대시보드 · 위키 열람만", isSystem: false },
-];
-
 async function main() {
-  const roles: Record<string, string> = {};
-  for (const r of ROLE_DEFS) {
-    const role = await prisma.role.upsert({
-      where: { key: r.key },
-      update: { name: r.name, description: r.description },
-      create: r,
-    });
-    roles[r.key] = role.id;
-
-    for (const [page, levels] of Object.entries(BASE_MATRIX)) {
-      await prisma.pagePermission.upsert({
-        where: { roleId_page: { roleId: role.id, page } },
-        update: { level: levels[r.key] ?? 0 },
-        create: { roleId: role.id, page, level: levels[r.key] ?? 0 },
-      });
-    }
-  }
-
   const adminEmail = process.env.ADMIN_EMAIL || "admin@example.com";
   const adminPassword = process.env.ADMIN_PASSWORD || "ChangeMe123!";
   const passwordHash = await bcrypt.hash(adminPassword, 12);
@@ -52,17 +15,16 @@ async function main() {
       email: adminEmail,
       passwordHash,
       name: "관리자",
-      roleId: roles.admin,
     },
   });
 
   const todoCount = await prisma.todo.count();
   if (todoCount === 0) {
     const today = new Date();
-    const inDays = (n: number) => new Date(today.getFullYear(), today.getMonth(), today.getDate() + n, 10, 0);
+    const inDays = (n: number, h = 10) => new Date(today.getFullYear(), today.getMonth(), today.getDate() + n, h, 0);
     await prisma.todo.createMany({
       data: [
-        { title: "주간 리포트 초안 검토", project: "Ops", repeat: "매주 월", tag: "업무", ownerId: admin.id, done: true, dueAt: inDays(0) },
+        { title: "주간 리포트 초안 검토", project: "Ops", repeat: "매주 월", tag: "업무", ownerId: admin.id, done: true, dueAt: inDays(-1) },
         { title: "자동화 화이트리스트 정리", project: "Platform", tag: "업무", ownerId: admin.id, dueAt: inDays(1) },
         { title: "백업 무결성 점검", project: "Infra", repeat: "매일", tag: "반복", ownerId: admin.id, dueAt: inDays(0) },
         { title: "위키 온보딩 문서 갱신", project: "Docs", tag: "개인", ownerId: admin.id, dueAt: inDays(3) },
