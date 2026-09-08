@@ -288,6 +288,35 @@ export function buildMcpServer(user: CurrentUser): McpServer {
     return ok(await listScriptFiles());
   });
 
+  // ---------- favorites ----------
+  server.registerTool("list_favorites", { title: "즐겨찾기 목록", description: "즐겨찾기(문서·URL) 목록을 조회합니다.", inputSchema: { folder: z.string().optional() } }, async ({ folder }) => {
+    const favorites = await prisma.favorite.findMany({ where: folder !== undefined ? { folder } : undefined, orderBy: [{ folder: "asc" }, { title: "asc" }] });
+    return ok(favorites);
+  });
+
+  server.registerTool(
+    "create_favorite",
+    { title: "즐겨찾기 추가", description: "새 즐겨찾기를 추가합니다.", inputSchema: { title: z.string(), url: z.string(), folder: z.string().optional() } },
+    async (args) => {
+      const favorite = await prisma.favorite.create({ data: { title: args.title, url: args.url, folder: args.folder || "", ownerId: user.id } });
+      return ok(favorite);
+    }
+  );
+
+  server.registerTool(
+    "update_favorite",
+    { title: "즐겨찾기 수정", description: "즐겨찾기의 제목·URL·폴더를 수정합니다.", inputSchema: { id: z.string(), title: z.string().optional(), url: z.string().optional(), folder: z.string().optional() } },
+    async ({ id, ...rest }) => {
+      const favorite = await prisma.favorite.update({ where: { id }, data: rest });
+      return ok(favorite);
+    }
+  );
+
+  server.registerTool("delete_favorite", { title: "즐겨찾기 삭제", description: "즐겨찾기를 삭제합니다.", inputSchema: { id: z.string() } }, async ({ id }) => {
+    await prisma.favorite.delete({ where: { id } });
+    return ok({ deleted: id });
+  });
+
   // ---------- audit log ----------
   server.registerTool("list_audit_log", { title: "감사 로그 조회", description: "계정·스크립트·파일 변경 이력을 조회합니다.", inputSchema: { limit: z.number().max(200).optional() } }, async ({ limit }) => {
     const logs = await prisma.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: limit || 50 });

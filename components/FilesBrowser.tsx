@@ -151,7 +151,7 @@ export function FilesBrowser({
   const [dirCache, setDirCache] = useState<Record<string, FileEntry[]>>({ [initialDir]: initialEntries });
   const [expanded, setExpanded] = useState<Set<string>>(new Set([""]));
   const [selected, setSelected] = useState<FileEntry | null>(null);
-  const [preview, setPreview] = useState<{ kind: string; text?: string } | null>(null);
+  const [preview, setPreview] = useState<{ kind: string; text?: string; html?: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [sharing, setSharing] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -201,6 +201,16 @@ export function FilesBrowser({
   const loadPreview = async (entry: FileEntry) => {
     setSelected(entry);
     setPreview(null);
+
+    if (entry.ext === "MD" || entry.ext === "HTML") {
+      const res = await fetch(`/api/files/render?path=${encodeURIComponent(entry.relPath)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setPreview({ kind: "doc", html: data.html });
+        return;
+      }
+    }
+
     const res = await fetch(`/api/files/content?path=${encodeURIComponent(entry.relPath)}`);
     const ct = res.headers.get("content-type") || "";
     if (ct.startsWith("image/")) setPreview({ kind: "image" });
@@ -380,7 +390,13 @@ export function FilesBrowser({
           <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderBottom: "1px solid var(--line)", flexWrap: "wrap" }}>
             <div style={{ fontSize: 13, fontWeight: 600, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{selected.name}</div>
             <button
-              onClick={() => window.open(contentUrl, "_blank", "noopener,noreferrer")}
+              onClick={() => {
+                const url =
+                  selected.ext === "MD" || selected.ext === "HTML"
+                    ? `/files/view?path=${encodeURIComponent(selected.relPath)}`
+                    : contentUrl;
+                window.open(url, "_blank", "noopener,noreferrer");
+              }}
               style={{ height: 27, padding: "0 10px", border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel2)", color: "var(--ink2)", fontSize: 11.5, cursor: "pointer" }}
             >
               ⤢ 새 창에서 보기
@@ -428,6 +444,11 @@ export function FilesBrowser({
             </button>
           </div>
           {!preview && <div style={{ padding: 24, fontSize: 12.5, color: "var(--ink3)" }}>불러오는 중...</div>}
+          {preview?.kind === "doc" && (
+            <article style={{ padding: "26px 30px", height: "calc(100vh - 220px)", minHeight: 320, overflow: "auto" }}>
+              <div className="wiki-content" style={{ color: "var(--ink2)", fontSize: 14, lineHeight: 1.75 }} dangerouslySetInnerHTML={{ __html: preview.html || "" }} />
+            </article>
+          )}
           {preview?.kind === "text" && (
             <pre
               style={{
