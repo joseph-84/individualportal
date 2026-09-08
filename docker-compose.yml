@@ -18,11 +18,19 @@ services:
 
   app:
     build: .
+    container_name: individualportal
     restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
     environment:
+      # Docker auto-injects HOSTNAME=<container id>, which the Next.js standalone server
+      # naively uses as its bind address (server.js: `process.env.HOSTNAME || '0.0.0.0'`).
+      # That resolves to just one of this container's network IPs instead of all
+      # interfaces, so it becomes unreachable from any network but the one Docker picked
+      # as "primary" — which is why nginx proxy manager (on a different docker network)
+      # got connection-refused even after DNS resolution started working. Force it.
+      HOSTNAME: "0.0.0.0"
       DATABASE_URL: postgresql://${POSTGRES_USER:-portal}:${POSTGRES_PASSWORD:-portal}@db:5432/${POSTGRES_DB:-portal}
       SESSION_SECRET: ${SESSION_SECRET}
       ADMIN_EMAIL: ${ADMIN_EMAIL}
@@ -35,6 +43,17 @@ services:
       - ${HOST_SCRIPTS_FOLDER:-./data-scripts}:/data/scripts
     ports:
       - "127.0.0.1:3411:3000"
+    networks:
+      - default
+      - npm_shared
+
+networks:
+  default: {}
+  # nginx proxy manager's network, so it can reach this container by name ("individualportal")
+  # instead of via the host port mapping above (which NPM, running in its own container, can't reach).
+  npm_shared:
+    name: docker_default
+    external: true
 
 volumes:
   portal_pgdata:
