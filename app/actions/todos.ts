@@ -4,9 +4,9 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requirePerm } from "@/lib/guard";
 
-function parsePriority(v: FormDataEntryValue | null): number {
-  const n = Number(v);
-  return n === 1 || n === 3 ? n : 2;
+async function nextOrder(parentId: string | null): Promise<number> {
+  const last = await prisma.todo.findFirst({ where: { parentId }, orderBy: { order: "desc" } });
+  return (last?.order ?? 0) + 1000;
 }
 
 export async function toggleTodoAction(id: string) {
@@ -23,6 +23,7 @@ export async function createTodoAction(formData: FormData) {
   if (!title) return;
   const dueRaw = String(formData.get("dueAt") || "");
   const parentId = String(formData.get("parentId") || "") || null;
+  const order = await nextOrder(parentId);
   await prisma.todo.create({
     data: {
       title,
@@ -31,7 +32,7 @@ export async function createTodoAction(formData: FormData) {
       tag: String(formData.get("tag") || "업무"),
       repeat: String(formData.get("repeat") || "") || null,
       dueAt: dueRaw ? new Date(`${dueRaw}T09:00:00`) : null,
-      priority: parsePriority(formData.get("priority")),
+      order,
       parentId,
       ownerId: user.id,
     },
@@ -60,7 +61,6 @@ export async function editTodoAction(_prev: EditTodoState, formData: FormData): 
       tag: String(formData.get("tag") || "업무"),
       repeat: String(formData.get("repeat") || "") || null,
       dueAt: dueRaw ? new Date(`${dueRaw}T09:00:00`) : null,
-      priority: parsePriority(formData.get("priority")),
     },
   });
   revalidatePath("/todos");
@@ -68,9 +68,17 @@ export async function editTodoAction(_prev: EditTodoState, formData: FormData): 
   return {};
 }
 
-export async function setTodoPriorityAction(id: string, priority: number) {
+/** Drag-and-drop reorder within the same sibling group (same parentId). `beforeOrder`/
+ * `afterOrder` are the order values of the two rows the item was dropped between (either
+ * may be omitted at the start/end of the list); the new order is the midpoint. */
+export async function reorderTodoAction(id: string, beforeOrder: number | null, afterOrder: number | null) {
   await requirePerm("todos", 2);
-  await prisma.todo.update({ where: { id }, data: { priority } });
+  let newOrder: number;
+  if (beforeOrder !== null && afterOrder !== null) newOrder = (beforeOrder + afterOrder) / 2;
+  else if (beforeOrder !== null) newOrder = beforeOrder + 1000;
+  else if (afterOrder !== null) newOrder = afterOrder - 1000;
+  else newOrder = 1000;
+  await prisma.todo.update({ where: { id }, data: { order: newOrder } });
   revalidatePath("/todos");
   revalidatePath("/dashboard");
 }

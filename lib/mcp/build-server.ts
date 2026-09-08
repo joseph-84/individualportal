@@ -30,7 +30,7 @@ export function buildMcpServer(user: CurrentUser): McpServer {
       const where: Record<string, unknown> = {};
       if (done !== undefined) where.done = done;
       if (parentId !== undefined) where.parentId = parentId;
-      const todos = await prisma.todo.findMany({ where, orderBy: [{ priority: "asc" }, { createdAt: "asc" }] });
+      const todos = await prisma.todo.findMany({ where, orderBy: { order: "asc" } });
       return ok(todos);
     }
   );
@@ -47,11 +47,12 @@ export function buildMcpServer(user: CurrentUser): McpServer {
         tag: z.enum(["업무", "반복", "개인", "마감"]).optional(),
         repeat: z.string().optional(),
         dueAt: z.string().optional().describe("ISO date, e.g. 2026-09-10"),
-        priority: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional().describe("1=high 2=medium 3=low"),
         parentId: z.string().optional(),
       },
     },
     async (args) => {
+      const parentId = args.parentId || null;
+      const last = await prisma.todo.findFirst({ where: { parentId }, orderBy: { order: "desc" } });
       const todo = await prisma.todo.create({
         data: {
           title: args.title,
@@ -60,8 +61,8 @@ export function buildMcpServer(user: CurrentUser): McpServer {
           tag: args.tag || "업무",
           repeat: args.repeat || null,
           dueAt: args.dueAt ? new Date(args.dueAt) : null,
-          priority: args.priority ?? 2,
-          parentId: args.parentId || null,
+          order: (last?.order ?? 0) + 1000,
+          parentId,
           ownerId: user.id,
         },
       });
@@ -82,7 +83,6 @@ export function buildMcpServer(user: CurrentUser): McpServer {
         tag: z.enum(["업무", "반복", "개인", "마감"]).optional(),
         repeat: z.string().optional(),
         dueAt: z.string().nullable().optional(),
-        priority: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
         done: z.boolean().optional(),
       },
     },
@@ -91,6 +91,34 @@ export function buildMcpServer(user: CurrentUser): McpServer {
         where: { id },
         data: { ...rest, ...(dueAt !== undefined ? { dueAt: dueAt ? new Date(dueAt) : null } : {}) },
       });
+      return ok(todo);
+    }
+  );
+
+  server.registerTool(
+    "reorder_todo",
+    {
+      title: "할일 순서 변경",
+      description: "할일의 표시 순서를 변경합니다. 같은 부모(parentId)를 가진 할일 목록 내에서, 지정한 두 할일 사이로 이동시킵니다. 목록 맨 앞/뒤로 옮기려면 beforeId 또는 afterId 중 하나를 생략하세요.",
+      inputSchema: {
+        id: z.string(),
+        beforeId: z.string().nullable().optional().describe("이 할일 바로 다음(뒤)으로 이동. 목록 맨 앞이면 생략."),
+        afterId: z.string().nullable().optional().describe("이 할일 바로 앞으로 이동. 목록 맨 뒤면 생략."),
+      },
+    },
+    async ({ id, beforeId, afterId }) => {
+      const [before, after] = await Promise.all([
+        beforeId ? prisma.todo.findUnique({ where: { id: beforeId } }) : null,
+        afterId ? prisma.todo.findUnique({ where: { id: afterId } }) : null,
+      ]);
+      const beforeOrder = before?.order ?? null;
+      const afterOrder = after?.order ?? null;
+      let newOrder: number;
+      if (beforeOrder !== null && afterOrder !== null) newOrder = (beforeOrder + afterOrder) / 2;
+      else if (beforeOrder !== null) newOrder = beforeOrder + 1000;
+      else if (afterOrder !== null) newOrder = afterOrder - 1000;
+      else newOrder = 1000;
+      const todo = await prisma.todo.update({ where: { id }, data: { order: newOrder } });
       return ok(todo);
     }
   );

@@ -18,6 +18,7 @@ export const TITLES: Record<string, [string, string]> = {
   automation: ["자동화 스크립트", "화이트리스트 등록 스크립트만 실행"],
   editor: ["코드 에디터", "스크립트 코드 편집"],
   auditlog: ["감사 로그", "계정·스크립트·파일 변경 이력"],
+  settings: ["설정", "외부 서비스 연동"],
 };
 
 export const ICONS: Record<string, string> = {

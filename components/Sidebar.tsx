@@ -119,6 +119,25 @@ export function Sidebar({ userName }: { userName: string }) {
             <div style={{ fontSize: 12.5, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{userName}</div>
           </div>
         </button>
+        <button
+          onClick={() => router.push("/settings")}
+          title="설정"
+          style={{
+            border: "1px solid var(--line)",
+            background: current === "settings" ? "var(--accent-soft)" : "var(--panel2)",
+            color: current === "settings" ? "var(--accent)" : "var(--ink3)",
+            borderRadius: 6,
+            width: 24,
+            height: 24,
+            cursor: "pointer",
+            fontSize: 12,
+            display: "grid",
+            placeItems: "center",
+            flex: "none",
+          }}
+        >
+          ⚙
+        </button>
         <form action={logoutAction}>
           <button
             type="submit"
