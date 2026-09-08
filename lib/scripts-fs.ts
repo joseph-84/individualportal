@@ -23,3 +23,20 @@ export async function readScriptFile(file: string): Promise<string> {
 export async function writeScriptFile(file: string, content: string): Promise<void> {
   await fs.writeFile(resolveScriptPath(file), content, "utf-8");
 }
+
+export async function deleteScriptFile(file: string): Promise<void> {
+  await fs.unlink(resolveScriptPath(file));
+}
+
+/** Creates a new script file with initial content. Returns false (no-op) if it already exists. */
+export async function createScriptFile(file: string, initialContent: string): Promise<boolean> {
+  const full = resolveScriptPath(file);
+  try {
+    await fs.access(full);
+    return false;
+  } catch {
+    await fs.writeFile(full, initialContent, "utf-8");
+    if (file.endsWith(".sh")) await fs.chmod(full, 0o755);
+    return true;
+  }
+}

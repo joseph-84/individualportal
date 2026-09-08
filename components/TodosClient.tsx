@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { toggleTodoAction, createTodoAction } from "@/app/actions/todos";
+import { useMemo, useState, useTransition } from "react";
+import { createTodoAction, deleteTodoAction } from "@/app/actions/todos";
 import { TodoCheckbox } from "./TodoCheckbox";
 
 interface TodoItem {
@@ -25,12 +25,35 @@ function seg(on: boolean): [string, string] {
   return on ? ["var(--panel)", "var(--ink)"] : ["transparent", "var(--ink2)"];
 }
 
+const FILTERS = ["전체", "오늘", "이번 주", "반복만"] as const;
+type Filter = (typeof FILTERS)[number];
+
+function isSameDay(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
 export function TodosClient({ todos, canWrite }: { todos: TodoItem[]; canWrite: boolean }) {
   const [view, setView] = useState<"list" | "cal">("list");
   const [showForm, setShowForm] = useState(false);
+  const [filter, setFilter] = useState<Filter>("전체");
   const [, startTransition] = useTransition();
   const [listBg, listFg] = seg(view === "list");
   const [calBg, calFg] = seg(view === "cal");
+
+  const filteredTodos = useMemo(() => {
+    if (filter === "전체") return todos;
+    if (filter === "반복만") return todos.filter((t) => !!t.repeat);
+    const now = new Date();
+    const weekEnd = new Date(now);
+    weekEnd.setDate(now.getDate() + (7 - now.getDay()));
+    return todos.filter((t) => {
+      if (!t.dueAt) return false;
+      const d = new Date(t.dueAt);
+      if (filter === "오늘") return isSameDay(d, now);
+      if (filter === "이번 주") return d >= new Date(now.getFullYear(), now.getMonth(), now.getDate()) && d <= weekEnd;
+      return true;
+    });
+  }, [todos, filter]);
 
   const now = new Date();
   const year = now.getFullYear();
@@ -73,6 +96,29 @@ export function TodosClient({ todos, canWrite }: { todos: TodoItem[]; canWrite: 
             캘린더
           </button>
         </div>
+        <div style={{ display: "flex", gap: 6 }}>
+          {FILTERS.map((f) => {
+            const on = filter === f;
+            return (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                style={{
+                  padding: "5px 11px",
+                  border: `1px solid ${on ? "var(--accent)" : "var(--line)"}`,
+                  borderRadius: 999,
+                  background: on ? "var(--accent-soft)" : "var(--panel)",
+                  color: on ? "var(--accent)" : "var(--ink2)",
+                  fontSize: 12,
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {f}
+              </button>
+            );
+          })}
+        </div>
         {canWrite && (
           <button
             onClick={() => setShowForm((v) => !v)}
@@ -93,6 +139,8 @@ export function TodosClient({ todos, canWrite }: { todos: TodoItem[]; canWrite: 
         >
           <input name="title" placeholder="제목" required style={{ flex: 1, minWidth: 160, height: 32, padding: "0 10px", border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel2)", color: "var(--ink)", fontSize: 12.5 }} />
           <input name="project" placeholder="프로젝트" style={{ width: 120, height: 32, padding: "0 10px", border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel2)", color: "var(--ink)", fontSize: 12.5 }} />
+          <input name="dueAt" type="date" style={{ height: 32, padding: "0 10px", border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel2)", color: "var(--ink)", fontSize: 12.5 }} />
+          <input name="repeat" placeholder="반복 (예: 매일)" style={{ width: 110, height: 32, padding: "0 10px", border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel2)", color: "var(--ink)", fontSize: 12.5 }} />
           <select name="tag" style={{ height: 32, border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel2)", color: "var(--ink)", fontSize: 12.5 }}>
             <option value="업무">업무</option>
             <option value="반복">반복</option>
@@ -110,10 +158,10 @@ export function TodosClient({ todos, canWrite }: { todos: TodoItem[]; canWrite: 
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "26px minmax(200px,1fr) 108px 104px 84px",
+              gridTemplateColumns: "26px minmax(200px,1fr) 108px 100px 104px 84px 30px",
               gap: 10,
               padding: "9px 15px",
-              minWidth: 700,
+              minWidth: 780,
               background: "var(--panel2)",
               borderBottom: "1px solid var(--line)",
               fontSize: 11,
@@ -125,22 +173,24 @@ export function TodosClient({ todos, canWrite }: { todos: TodoItem[]; canWrite: 
             <div></div>
             <div>제목</div>
             <div>프로젝트</div>
+            <div>마감일</div>
             <div>반복</div>
             <div>분류</div>
+            <div></div>
           </div>
-          {todos.length === 0 && <div style={{ padding: "24px 15px", fontSize: 12.5, color: "var(--ink3)" }}>등록된 할일이 없습니다.</div>}
-          {todos.map((t) => {
+          {filteredTodos.length === 0 && <div style={{ padding: "24px 15px", fontSize: 12.5, color: "var(--ink3)" }}>표시할 할일이 없습니다.</div>}
+          {filteredTodos.map((t) => {
             const [tagBg, tagFg] = CHIP[t.tag] || CHIP.개인;
             return (
               <div
                 key={t.id}
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "26px minmax(200px,1fr) 108px 104px 84px",
+                  gridTemplateColumns: "26px minmax(200px,1fr) 108px 100px 104px 84px 30px",
                   gap: 10,
                   alignItems: "center",
                   padding: "9px 15px",
-                  minWidth: 700,
+                  minWidth: 780,
                   borderBottom: "1px solid var(--line2)",
                 }}
               >
@@ -159,10 +209,24 @@ export function TodosClient({ todos, canWrite }: { todos: TodoItem[]; canWrite: 
                   {t.title}
                 </div>
                 <div style={{ fontSize: 12, color: "var(--ink2)" }}>{t.project || "—"}</div>
+                <div style={{ fontFamily: "var(--font-mono), monospace", fontSize: 11.5, color: "var(--ink3)" }}>
+                  {t.dueAt ? new Date(t.dueAt).toLocaleDateString("ko-KR", { month: "2-digit", day: "2-digit" }) : "—"}
+                </div>
                 <div style={{ fontFamily: "var(--font-mono), monospace", fontSize: 11.5, color: "var(--ink3)" }}>{t.repeat || "—"}</div>
                 <div>
                   <span style={{ fontSize: 10.5, fontWeight: 500, padding: "2px 8px", borderRadius: 999, background: tagBg, color: tagFg }}>{t.tag}</span>
                 </div>
+                {canWrite ? (
+                  <button
+                    onClick={() => startTransition(() => deleteTodoAction(t.id))}
+                    title="삭제"
+                    style={{ width: 22, height: 22, border: 0, background: "transparent", color: "var(--ink3)", cursor: "pointer", fontSize: 12 }}
+                  >
+                    ✕
+                  </button>
+                ) : (
+                  <div />
+                )}
               </div>
             );
           })}

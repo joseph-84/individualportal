@@ -29,18 +29,22 @@ model PagePermission {
 }
 
 model User {
-  id           String     @id @default(cuid())
-  email        String     @unique
-  passwordHash String
-  name         String
-  active       Boolean    @default(true)
-  lastLoginAt  DateTime?
-  roleId       String
-  role         Role       @relation(fields: [roleId], references: [id])
-  todos        Todo[]
-  notes        Note[]
-  scriptRuns   ScriptRun[]
-  createdAt    DateTime   @default(now())
+  id               String      @id @default(cuid())
+  email            String      @unique
+  passwordHash     String
+  name             String
+  active           Boolean     @default(true)
+  lastLoginAt      DateTime?
+  failedLoginCount Int         @default(0)
+  lockedUntil      DateTime?
+  tokenVersion     Int         @default(0)
+  roleId           String
+  role             Role        @relation(fields: [roleId], references: [id])
+  todos            Todo[]
+  notes            Note[]
+  scriptRuns       ScriptRun[]
+  auditLogs        AuditLog[]
+  createdAt        DateTime    @default(now())
 }
 
 model Todo {
@@ -91,4 +95,15 @@ model ScriptRun {
   triggeredBy String?
   userId      String?
   user        User?     @relation(fields: [userId], references: [id])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id])
+  actorName String
+  action    String
+  target    String
+  meta      String?
+  createdAt DateTime @default(now())
 }

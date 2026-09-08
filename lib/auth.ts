@@ -20,6 +20,7 @@ export async function verifyPassword(password: string, hash: string) {
 
 export interface SessionPayload {
   sub: string; // user id
+  tv: number; // tokenVersion at issue time — bumping the user's tokenVersion invalidates this token
 }
 
 export async function createSessionToken(payload: SessionPayload) {
@@ -33,8 +34,8 @@ export async function createSessionToken(payload: SessionPayload) {
 export async function verifySessionToken(token: string): Promise<SessionPayload | null> {
   try {
     const { payload } = await jwtVerify(token, secretKey());
-    if (typeof payload.sub !== "string") return null;
-    return { sub: payload.sub };
+    if (typeof payload.sub !== "string" || typeof payload.tv !== "number") return null;
+    return { sub: payload.sub, tv: payload.tv };
   } catch {
     return null;
   }
