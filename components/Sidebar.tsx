@@ -6,66 +6,10 @@ import { pageKeyToPath, pathToPageKey } from "@/lib/routing";
 import { logoutAction } from "@/app/actions/auth";
 import { Icon } from "./Icon";
 
-interface Props {
-  roleKey: string;
-  roleName: string;
-  userName: string;
-  permissions: Record<string, number>;
-}
-
-export function Sidebar({ roleKey, roleName, userName, permissions }: Props) {
+export function Sidebar({ userName }: { userName: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const current = pathToPageKey(pathname);
-
-  const mainItems = PAGES.filter((p) => !p.admin);
-  const adminItems = PAGES.filter((p) => p.admin).filter((p) => (permissions[p.key] ?? 0) > 0);
-
-  const renderItem = (p: (typeof PAGES)[number]) => {
-    const lvl = permissions[p.key] ?? 0;
-    if (lvl === 0) return null;
-    const on = current === p.key;
-    return (
-      <button
-        key={p.key}
-        onClick={() => router.push(pageKeyToPath(p.key))}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          width: "100%",
-          padding: 8,
-          border: 0,
-          borderRadius: 7,
-          background: on ? "var(--accent-soft)" : "transparent",
-          color: on ? "var(--accent)" : "var(--ink2)",
-          fontSize: 13,
-          fontWeight: on ? 600 : 450,
-          cursor: "pointer",
-          textAlign: "left",
-        }}
-      >
-        <span style={{ width: 16, height: 16, flex: "none", display: "grid", placeItems: "center", opacity: on ? 1 : 0.7 }}>
-          <Icon name={p.icon} />
-        </span>
-        <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.label}</span>
-        {lvl === 1 && (
-          <span
-            style={{
-              fontFamily: "var(--font-mono), monospace",
-              fontSize: 9.5,
-              color: "var(--ink3)",
-              border: "1px solid var(--line)",
-              borderRadius: 3,
-              padding: "0 3px",
-            }}
-          >
-            R
-          </span>
-        )}
-      </button>
-    );
-  };
 
   return (
     <aside
@@ -98,19 +42,6 @@ export function Sidebar({ roleKey, roleName, userName, permissions }: Props) {
           P
         </div>
         <div style={{ fontWeight: 600, fontSize: 13.5, letterSpacing: "-.01em" }}>Portal</div>
-        <div
-          style={{
-            marginLeft: "auto",
-            fontFamily: "var(--font-mono), monospace",
-            fontSize: 10,
-            color: "var(--ink3)",
-            border: "1px solid var(--line)",
-            borderRadius: 4,
-            padding: "1px 5px",
-          }}
-        >
-          {roleKey}
-        </div>
       </div>
       <div
         style={{
@@ -124,22 +55,35 @@ export function Sidebar({ roleKey, roleName, userName, permissions }: Props) {
       >
         WORKSPACE
       </div>
-      {mainItems.map(renderItem)}
-      {adminItems.length > 0 && (
-        <div
-          style={{
-            fontFamily: "var(--font-mono), monospace",
-            fontSize: 10,
-            fontWeight: 600,
-            letterSpacing: ".12em",
-            color: "var(--ink3)",
-            padding: "16px 8px 5px",
-          }}
-        >
-          ADMIN
-        </div>
-      )}
-      {adminItems.map(renderItem)}
+      {PAGES.map((p) => {
+        const on = current === p.key;
+        return (
+          <button
+            key={p.key}
+            onClick={() => router.push(pageKeyToPath(p.key))}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              width: "100%",
+              padding: 8,
+              border: 0,
+              borderRadius: 7,
+              background: on ? "var(--accent-soft)" : "transparent",
+              color: on ? "var(--accent)" : "var(--ink2)",
+              fontSize: 13,
+              fontWeight: on ? 600 : 450,
+              cursor: "pointer",
+              textAlign: "left",
+            }}
+          >
+            <span style={{ width: 16, height: 16, flex: "none", display: "grid", placeItems: "center", opacity: on ? 1 : 0.7 }}>
+              <Icon name={p.icon} />
+            </span>
+            <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.label}</span>
+          </button>
+        );
+      })}
       <div
         style={{
           marginTop: "auto",
@@ -173,7 +117,6 @@ export function Sidebar({ roleKey, roleName, userName, permissions }: Props) {
           </div>
           <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ fontSize: 12.5, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{userName}</div>
-            <div style={{ fontSize: 11, color: "var(--ink3)" }}>{roleName}</div>
           </div>
         </button>
         <form action={logoutAction}>

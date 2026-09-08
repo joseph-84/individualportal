@@ -7,6 +7,6 @@ export function pathToPageKey(pathname: string): PageKey {
 }
 
 export function pageKeyToPath(key: PageKey): string {
-  if (key === "users" || key === "roles" || key === "auditlog") return `/admin/${key}`;
+  if (key === "auditlog") return `/admin/${key}`;
   return `/${key}`;
 }

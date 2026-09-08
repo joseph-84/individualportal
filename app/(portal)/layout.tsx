@@ -8,9 +8,9 @@ export default async function PortalLayout({ children }: { children: React.React
 
   return (
     <ThemedShell>
-      <Sidebar roleKey={user.role.key} roleName={user.role.name} userName={user.name} permissions={user.permissions} />
+      <Sidebar userName={user.name} />
       <div style={{ minWidth: 0, display: "flex", flexDirection: "column" }}>
-        <Header roleName={user.role.name} />
+        <Header />
         <main style={{ flex: 1, minWidth: 0, padding: 18 }}>{children}</main>
       </div>
     </ThemedShell>

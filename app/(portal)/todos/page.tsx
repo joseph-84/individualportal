@@ -1,11 +1,9 @@
 import { pageAccess } from "@/lib/guard";
-import { Denied } from "@/components/Denied";
 import { prisma } from "@/lib/prisma";
 import { TodosClient } from "@/components/TodosClient";
 
 export default async function TodosPage() {
   const { user, level } = await pageAccess("todos");
-  if (level === 0) return <Denied roleName={user.role.name} />;
 
   const todos = await prisma.todo.findMany({ orderBy: [{ priority: "asc" }, { createdAt: "asc" }] });
 

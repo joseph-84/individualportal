@@ -37,6 +37,8 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       SYNC_FOLDER_PATH: /data/mount
       SCRIPTS_PATH: /data/scripts
+      GMAIL_USER: ${GMAIL_USER}
+      GMAIL_APP_PASSWORD: ${GMAIL_APP_PASSWORD}
       NODE_ENV: production
     volumes:
       - ${HOST_SYNC_FOLDER:-./data-mount}:/data/mount

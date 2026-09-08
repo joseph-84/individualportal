@@ -14,7 +14,7 @@ export function generateApiToken(): { token: string; prefix: string } {
 }
 
 /** Resolves an `Authorization: Bearer <token>` header to the owning user, exactly like
- * a cookie session — same CurrentUser shape, same permissions map. */
+ * a cookie session. Single-user portal: no roles/permissions to resolve. */
 export async function verifyApiToken(authHeader: string | null): Promise<CurrentUser | null> {
   if (!authHeader?.startsWith("Bearer ")) return null;
   const token = authHeader.slice(7).trim();
@@ -24,23 +24,10 @@ export async function verifyApiToken(authHeader: string | null): Promise<Current
   const apiToken = await prisma.apiToken.findUnique({ where: { tokenHash } });
   if (!apiToken || apiToken.revoked) return null;
 
-  const user = await prisma.user.findUnique({
-    where: { id: apiToken.userId },
-    include: { role: { include: { permissions: true } } },
-  });
+  const user = await prisma.user.findUnique({ where: { id: apiToken.userId } });
   if (!user || !user.active) return null;
 
   prisma.apiToken.update({ where: { id: apiToken.id }, data: { lastUsedAt: new Date() } }).catch(() => {});
 
-  const permissions: Record<string, number> = {};
-  for (const p of user.role.permissions) permissions[p.page] = p.level;
-
-  return {
-    id: user.id,
-    email: user.email,
-    name: user.name,
-    active: user.active,
-    role: { id: user.role.id, key: user.role.key, name: user.role.name },
-    permissions,
-  };
+  return { id: user.id, email: user.email, name: user.name, active: user.active };
 }

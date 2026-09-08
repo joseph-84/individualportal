@@ -7,7 +7,7 @@ import { useTheme } from "@/lib/theme-context";
 import { HeaderSearch } from "./HeaderSearch";
 import { NotificationBell } from "./NotificationBell";
 
-export function Header({ roleName }: { roleName: string }) {
+export function Header() {
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
   const pageKey = pathToPageKey(pathname);
@@ -45,20 +45,6 @@ export function Header({ roleName }: { roleName: string }) {
       </div>
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
         <HeaderSearch />
-        <div
-          style={{
-            fontSize: 11.5,
-            color: "var(--ink3)",
-            border: "1px solid var(--line)",
-            borderRadius: 7,
-            padding: "0 10px",
-            height: 30,
-            display: "flex",
-            alignItems: "center",
-          }}
-        >
-          {roleName}
-        </div>
         <button
           onClick={toggleTheme}
           title="테마"

@@ -1,5 +1,4 @@
 import { pageAccess } from "@/lib/guard";
-import { Denied } from "@/components/Denied";
 import { prisma } from "@/lib/prisma";
 
 const ACTION_LABEL: Record<string, string> = {
@@ -23,7 +22,6 @@ const ACTION_LABEL: Record<string, string> = {
 
 export default async function AuditLogPage() {
   const { user, level } = await pageAccess("auditlog");
-  if (level === 0) return <Denied roleName={user.role.name} />;
 
   const logs = await prisma.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 200 });
 
