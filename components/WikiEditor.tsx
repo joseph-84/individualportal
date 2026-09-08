@@ -8,6 +8,7 @@ interface Props {
   noteId: string;
   path: string;
   title: string;
+  format: string; // "md" | "html"
   content: string;
   html: string;
   updatedAt: string;
@@ -18,7 +19,7 @@ function seg(on: boolean): [string, string] {
   return on ? ["var(--panel)", "var(--ink)"] : ["transparent", "var(--ink2)"];
 }
 
-const TOOLBAR: { label: string; before: string; after: string; block?: boolean }[] = [
+const MD_TOOLBAR: { label: string; before: string; after: string; block?: boolean }[] = [
   { label: "H1", before: "# ", after: "", block: true },
   { label: "H2", before: "## ", after: "", block: true },
   { label: "B", before: "**", after: "**" },
@@ -28,7 +29,17 @@ const TOOLBAR: { label: string; before: string; after: string; block?: boolean }
   { label: "표", before: "\n| 열1 | 열2 |\n| --- | --- |\n| 값1 | 값2 |\n", after: "" },
 ];
 
-export function WikiEditor({ noteId, path, title, content, html, updatedAt, canWrite }: Props) {
+const HTML_TOOLBAR: { label: string; before: string; after: string; block?: boolean }[] = [
+  { label: "H1", before: "<h1>", after: "</h1>" },
+  { label: "H2", before: "<h2>", after: "</h2>" },
+  { label: "B", before: "<strong>", after: "</strong>" },
+  { label: "I", before: "<em>", after: "</em>" },
+  { label: "P", before: "<p>", after: "</p>" },
+  { label: "</>", before: "<code>", after: "</code>" },
+  { label: "표", before: "\n<table><tr><th>열1</th><th>열2</th></tr><tr><td>값1</td><td>값2</td></tr></table>\n", after: "" },
+];
+
+export function WikiEditor({ noteId, path, title, format, content, html, updatedAt, canWrite }: Props) {
   const [mode, setMode] = useState<"view" | "edit">("view");
   const [source, setSource] = useState(content);
   const [pending, startTransition] = useTransition();
@@ -37,6 +48,7 @@ export function WikiEditor({ noteId, path, title, content, html, updatedAt, canW
   const [viewBg, viewFg] = seg(mode === "view");
   const [editBg, editFg] = seg(mode === "edit");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const toolbar = format === "html" ? HTML_TOOLBAR : MD_TOOLBAR;
 
   const save = () => {
     startTransition(async () => {
@@ -67,10 +79,13 @@ export function WikiEditor({ noteId, path, title, content, html, updatedAt, canW
     startDelete(() => deleteNoteAction(noteId));
   };
 
+  const livePreviewHtml = format === "html" ? source : (marked.parse(source, { async: false }) as string);
+
   return (
     <>
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 15px", borderBottom: "1px solid var(--line)" }}>
         <div style={{ fontFamily: "var(--font-mono), monospace", fontSize: 11.5, color: "var(--ink3)" }}>{path}</div>
+        <span style={{ fontSize: 9.5, fontWeight: 700, padding: "1px 5px", borderRadius: 4, background: "var(--panel3)", color: "var(--ink2)" }}>{format.toUpperCase()}</span>
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 9 }}>
           <span style={{ fontSize: 11.5, color: "var(--ink3)" }}>
             {pending ? "저장 중..." : savedAt ? `${savedAt} 저장됨` : `최종 수정 ${new Date(updatedAt).toLocaleString("ko-KR")}`}
@@ -116,7 +131,7 @@ export function WikiEditor({ noteId, path, title, content, html, updatedAt, canW
           <div style={{ borderRight: "1px solid var(--line)" }}>
             <div style={{ display: "flex", gap: 4, padding: "7px 10px", borderBottom: "1px solid var(--line2)", background: "var(--panel2)", justifyContent: "space-between" }}>
               <div style={{ display: "flex", gap: 4 }}>
-                {TOOLBAR.map((t) => (
+                {toolbar.map((t) => (
                   <button
                     key={t.label}
                     type="button"
@@ -147,11 +162,7 @@ export function WikiEditor({ noteId, path, title, content, html, updatedAt, canW
             <div style={{ fontFamily: "var(--font-mono), monospace", fontSize: 10, fontWeight: 600, letterSpacing: ".1em", color: "var(--ink3)", marginBottom: 12 }}>
               PREVIEW
             </div>
-            <div
-              className="wiki-content"
-              style={{ color: "var(--ink2)", fontSize: 13.5, lineHeight: 1.7 }}
-              dangerouslySetInnerHTML={{ __html: marked.parse(source, { async: false }) as string }}
-            />
+            <div className="wiki-content" style={{ color: "var(--ink2)", fontSize: 13.5, lineHeight: 1.7 }} dangerouslySetInnerHTML={{ __html: livePreviewHtml }} />
           </div>
         </div>
       )}

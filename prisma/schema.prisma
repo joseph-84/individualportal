@@ -44,26 +44,34 @@ model User {
   notes            Note[]
   scriptRuns       ScriptRun[]
   auditLogs        AuditLog[]
+  shareLinks       ShareLink[]
+  apiTokens        ApiToken[]
   createdAt        DateTime    @default(now())
 }
 
 model Todo {
-  id        String    @id @default(cuid())
-  title     String
-  project   String?
-  tag       String?
-  repeat    String?
-  dueAt     DateTime?
-  done      Boolean   @default(false)
-  ownerId   String
-  owner     User      @relation(fields: [ownerId], references: [id])
-  createdAt DateTime  @default(now())
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  project     String?
+  tag         String?
+  repeat      String?
+  dueAt       DateTime?
+  done        Boolean   @default(false)
+  priority    Int       @default(2) // 1 = high, 2 = medium, 3 = low
+  ownerId     String
+  owner       User      @relation(fields: [ownerId], references: [id])
+  parentId    String?
+  parent      Todo?     @relation("TodoChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children    Todo[]    @relation("TodoChildren")
+  createdAt   DateTime  @default(now())
 }
 
 model Note {
   id        String   @id @default(cuid())
   title     String
   folder    String   @default("")
+  format    String   @default("md") // "md" | "html"
   content   String
   tags      String[]
   ownerId   String
@@ -95,6 +103,32 @@ model ScriptRun {
   triggeredBy String?
   userId      String?
   user        User?     @relation(fields: [userId], references: [id])
+}
+
+model ShareLink {
+  id             String    @id @default(cuid())
+  token          String    @unique
+  relPath        String
+  scope          String // "members" | "public"
+  createdById    String
+  createdBy      User      @relation(fields: [createdById], references: [id])
+  revoked        Boolean   @default(false)
+  lastAccessedAt DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([relPath])
+}
+
+model ApiToken {
+  id          String    @id @default(cuid())
+  name        String
+  tokenHash   String    @unique
+  tokenPrefix String
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  revoked     Boolean   @default(false)
+  lastUsedAt  DateTime?
+  createdAt   DateTime  @default(now())
 }
 
 model AuditLog {

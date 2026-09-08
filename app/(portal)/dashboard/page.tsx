@@ -16,13 +16,14 @@ const RUN_BG: Record<string, string> = { ok: "var(--ok-soft)", running: "var(--a
 const RUN_FG: Record<string, string> = { ok: "var(--ok)", running: "var(--accent)", err: "var(--err)" };
 const RUN_LABEL: Record<string, string> = { ok: "성공", running: "실행중", err: "실패" };
 const OP_COLOR: [string, string] = ["var(--accent-soft)", "var(--accent)"];
+const PRIORITY_COLOR: Record<number, string> = { 1: "var(--err)", 2: "var(--ink3)", 3: "var(--ink3)" };
 
 export default async function DashboardPage() {
   const { user, level } = await pageAccess("dashboard");
   if (level === 0) return <Denied roleName={user.role.name} />;
 
   const [todos, incompleteCount, notes, runs, weekRuns, errRuns, files] = await Promise.all([
-    prisma.todo.findMany({ orderBy: { createdAt: "asc" }, take: 5 }),
+    prisma.todo.findMany({ where: { parentId: null }, orderBy: [{ priority: "asc" }, { createdAt: "asc" }], take: 5 }),
     prisma.todo.count({ where: { done: false } }),
     prisma.note.findMany({ orderBy: { updatedAt: "desc" }, take: 4 }),
     prisma.scriptRun.findMany({ orderBy: { startedAt: "desc" }, take: 5, include: { script: true } }),
@@ -71,6 +72,9 @@ export default async function DashboardPage() {
             return (
               <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 15px", borderBottom: "1px solid var(--line2)" }}>
                 <TodoCheckbox id={t.id} done={t.done} canWrite={level === 2} />
+                {t.priority === 1 && !t.done && (
+                  <span title="높은 우선순위" style={{ width: 6, height: 6, borderRadius: "50%", background: PRIORITY_COLOR[1], flex: "none" }} />
+                )}
                 <div
                   style={{
                     flex: 1,

@@ -1,16 +1,19 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
-import { createTodoAction, deleteTodoAction } from "@/app/actions/todos";
+import { useMemo, useState, useTransition, useActionState } from "react";
+import { createTodoAction, deleteTodoAction, editTodoAction, setTodoPriorityAction, type EditTodoState } from "@/app/actions/todos";
 import { TodoCheckbox } from "./TodoCheckbox";
 
 interface TodoItem {
   id: string;
   title: string;
+  description: string | null;
   project: string | null;
   repeat: string | null;
   tag: string;
   done: boolean;
+  priority: number;
+  parentId: string | null;
   dueAt: string | null;
 }
 
@@ -20,6 +23,12 @@ const CHIP: Record<string, [string, string]> = {
   개인: ["var(--panel3)", "var(--ink2)"],
   마감: ["var(--err-soft)", "var(--err)"],
 };
+
+const PRIORITY = {
+  1: { label: "높음", color: "var(--err)" },
+  2: { label: "보통", color: "var(--ink3)" },
+  3: { label: "낮음", color: "var(--ok)" },
+} as const;
 
 function seg(on: boolean): [string, string] {
   return on ? ["var(--panel)", "var(--ink)"] : ["transparent", "var(--ink2)"];
@@ -32,33 +41,217 @@ function isSameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
+function PriorityDot({ id, priority, canWrite }: { id: string; priority: number; canWrite: boolean }) {
+  const [pending, startTransition] = useTransition();
+  const cycle = () => {
+    if (!canWrite) return;
+    const next = priority === 1 ? 2 : priority === 2 ? 3 : 1;
+    startTransition(() => setTodoPriorityAction(id, next));
+  };
+  const p = PRIORITY[priority as 1 | 2 | 3] || PRIORITY[2];
+  return (
+    <button
+      onClick={cycle}
+      disabled={!canWrite || pending}
+      title={`우선순위: ${p.label} (클릭하여 변경)`}
+      style={{ width: 20, height: 20, flex: "none", border: "1px solid var(--line)", borderRadius: 5, background: "var(--panel)", color: p.color, fontSize: 9.5, fontWeight: 700, cursor: canWrite ? "pointer" : "default", opacity: pending ? 0.5 : 1 }}
+    >
+      {priority === 1 ? "!" : priority === 3 ? "↓" : "–"}
+    </button>
+  );
+}
+
+const initialEdit: EditTodoState = {};
+
+function EditTodoForm({ todo, onDone }: { todo: TodoItem; onDone: () => void }) {
+  const [state, formAction, pending] = useActionState(async (_prev: EditTodoState, fd: FormData) => {
+    const res = await editTodoAction(_prev, fd);
+    if (!res.error) onDone();
+    return res;
+  }, initialEdit);
+
+  return (
+    <form action={formAction} style={{ display: "grid", gap: 8, padding: 12, background: "var(--panel2)", border: "1px solid var(--line)", borderRadius: 8, marginTop: 4, marginBottom: 4 }}>
+      <input type="hidden" name="id" value={todo.id} />
+      <input name="title" defaultValue={todo.title} required placeholder="제목" style={{ height: 30, padding: "0 9px", border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel)", color: "var(--ink)", fontSize: 12.5 }} />
+      <textarea
+        name="description"
+        defaultValue={todo.description || ""}
+        placeholder="설명"
+        rows={3}
+        style={{ padding: 9, border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel)", color: "var(--ink)", fontSize: 12.5, resize: "vertical", fontFamily: "inherit" }}
+      />
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <input name="project" defaultValue={todo.project || ""} placeholder="프로젝트" style={{ width: 120, height: 30, padding: "0 9px", border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel)", color: "var(--ink)", fontSize: 12.5 }} />
+        <input name="dueAt" type="date" defaultValue={todo.dueAt ? todo.dueAt.slice(0, 10) : ""} style={{ height: 30, padding: "0 9px", border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel)", color: "var(--ink)", fontSize: 12.5 }} />
+        <input name="repeat" defaultValue={todo.repeat || ""} placeholder="반복 (예: 매일)" style={{ width: 110, height: 30, padding: "0 9px", border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel)", color: "var(--ink)", fontSize: 12.5 }} />
+        <select name="tag" defaultValue={todo.tag} style={{ height: 30, border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel)", color: "var(--ink)", fontSize: 12.5 }}>
+          <option value="업무">업무</option>
+          <option value="반복">반복</option>
+          <option value="개인">개인</option>
+          <option value="마감">마감</option>
+        </select>
+        <select name="priority" defaultValue={String(todo.priority)} style={{ height: 30, border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel)", color: "var(--ink)", fontSize: 12.5 }}>
+          <option value="1">우선순위: 높음</option>
+          <option value="2">우선순위: 보통</option>
+          <option value="3">우선순위: 낮음</option>
+        </select>
+      </div>
+      {state.error && <div style={{ fontSize: 12, color: "var(--err)" }}>{state.error}</div>}
+      <div style={{ display: "flex", gap: 6 }}>
+        <button type="submit" disabled={pending} style={{ height: 30, padding: "0 14px", border: 0, borderRadius: 6, background: "var(--accent)", color: "var(--on-accent)", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>
+          {pending ? "저장 중..." : "저장"}
+        </button>
+        <button type="button" onClick={onDone} style={{ height: 30, padding: "0 14px", border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel)", color: "var(--ink2)", fontSize: 12.5, cursor: "pointer" }}>
+          취소
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function TodoRow({
+  todo,
+  depth,
+  byParent,
+  canWrite,
+  editingId,
+  setEditingId,
+  addingParentId,
+  setAddingParentId,
+}: {
+  todo: TodoItem;
+  depth: number;
+  byParent: Map<string, TodoItem[]>;
+  canWrite: boolean;
+  editingId: string | null;
+  setEditingId: (id: string | null) => void;
+  addingParentId: string | null;
+  setAddingParentId: (id: string | null) => void;
+}) {
+  const [collapsed, setCollapsed] = useState(false);
+  const [, startTransition] = useTransition();
+  const [tagBg, tagFg] = CHIP[todo.tag] || CHIP.개인;
+  const editing = editingId === todo.id;
+  const adding = addingParentId === todo.id;
+  const children = byParent.get(todo.id) || [];
+
+  return (
+    <div style={{ borderBottom: depth === 0 ? "1px solid var(--line2)" : "none" }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "9px 15px", paddingLeft: 15 + depth * 22 }}>
+        {children.length > 0 ? (
+          <button onClick={() => setCollapsed((v) => !v)} style={{ width: 16, height: 20, border: 0, background: "transparent", color: "var(--ink3)", cursor: "pointer", fontSize: 10, flex: "none" }}>
+            {collapsed ? "▸" : "▾"}
+          </button>
+        ) : (
+          <span style={{ width: 16, flex: "none" }} />
+        )}
+        <div style={{ marginTop: 2 }}>
+          <TodoCheckbox id={todo.id} done={todo.done} canWrite={canWrite} />
+        </div>
+        <div style={{ marginTop: 1 }}>
+          <PriorityDot id={todo.id} priority={todo.priority} canWrite={canWrite} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, color: todo.done ? "var(--ink3)" : "var(--ink)", textDecoration: todo.done ? "line-through" : "none" }}>{todo.title}</div>
+          {todo.description && <div style={{ fontSize: 11.5, color: "var(--ink3)", marginTop: 2, whiteSpace: "pre-wrap" }}>{todo.description}</div>}
+          <div style={{ display: "flex", gap: 8, marginTop: 3, fontSize: 11, color: "var(--ink3)", fontFamily: "var(--font-mono), monospace" }}>
+            {todo.project && <span>{todo.project}</span>}
+            {todo.dueAt && <span>{new Date(todo.dueAt).toLocaleDateString("ko-KR", { month: "2-digit", day: "2-digit" })}</span>}
+            {todo.repeat && <span>↻{todo.repeat}</span>}
+          </div>
+        </div>
+        <span style={{ fontSize: 10.5, fontWeight: 500, padding: "2px 8px", borderRadius: 999, background: tagBg, color: tagFg, flex: "none" }}>{todo.tag}</span>
+        {canWrite && (
+          <div style={{ display: "flex", gap: 4, flex: "none" }}>
+            <button onClick={() => setAddingParentId(adding ? null : todo.id)} title="하위 할일 추가" style={{ width: 22, height: 22, border: "1px solid var(--line)", borderRadius: 5, background: "var(--panel)", color: "var(--ink2)", cursor: "pointer", fontSize: 12 }}>
+              +
+            </button>
+            <button onClick={() => setEditingId(editing ? null : todo.id)} title="편집" style={{ width: 22, height: 22, border: "1px solid var(--line)", borderRadius: 5, background: "var(--panel)", color: "var(--ink2)", cursor: "pointer", fontSize: 11 }}>
+              ✎
+            </button>
+            <button
+              onClick={() => confirm(`"${todo.title}"을(를) 삭제할까요?${children.length ? " 하위 할일도 함께 삭제됩니다." : ""}`) && startTransition(() => deleteTodoAction(todo.id))}
+              title="삭제"
+              style={{ width: 22, height: 22, border: "1px solid var(--line)", borderRadius: 5, background: "var(--panel)", color: "var(--ink3)", cursor: "pointer", fontSize: 11 }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
+      </div>
+
+      {editing && (
+        <div style={{ paddingLeft: 15 + depth * 22, paddingRight: 15 }}>
+          <EditTodoForm todo={todo} onDone={() => setEditingId(null)} />
+        </div>
+      )}
+
+      {adding && (
+        <div style={{ paddingLeft: 15 + (depth + 1) * 22, paddingRight: 15 }}>
+          <form
+            action={(fd) => {
+              startTransition(() => createTodoAction(fd));
+              setAddingParentId(null);
+            }}
+            style={{ display: "flex", gap: 6, padding: 10, background: "var(--panel2)", border: "1px solid var(--line)", borderRadius: 8, marginBottom: 6, flexWrap: "wrap" }}
+          >
+            <input type="hidden" name="parentId" value={todo.id} />
+            <input name="title" placeholder="하위 할일 제목" required autoFocus style={{ flex: 1, minWidth: 140, height: 28, padding: "0 8px", border: "1px solid var(--line)", borderRadius: 5, background: "var(--panel)", color: "var(--ink)", fontSize: 12 }} />
+            <button type="submit" style={{ height: 28, padding: "0 12px", border: 0, borderRadius: 5, background: "var(--accent)", color: "var(--on-accent)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+              추가
+            </button>
+          </form>
+        </div>
+      )}
+
+      {!collapsed &&
+        children.map((c) => (
+          <TodoRow key={c.id} todo={c} depth={depth + 1} byParent={byParent} canWrite={canWrite} editingId={editingId} setEditingId={setEditingId} addingParentId={addingParentId} setAddingParentId={setAddingParentId} />
+        ))}
+    </div>
+  );
+}
+
 export function TodosClient({ todos, canWrite }: { todos: TodoItem[]; canWrite: boolean }) {
   const [view, setView] = useState<"list" | "cal">("list");
   const [showForm, setShowForm] = useState(false);
   const [filter, setFilter] = useState<Filter>("전체");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [addingParentId, setAddingParentId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   const [listBg, listFg] = seg(view === "list");
   const [calBg, calFg] = seg(view === "cal");
 
-  const filteredTodos = useMemo(() => {
-    if (filter === "전체") return todos;
-    if (filter === "반복만") return todos.filter((t) => !!t.repeat);
+  const byParent = useMemo(() => {
+    const m = new Map<string, TodoItem[]>();
+    for (const t of todos) {
+      const key = t.parentId || "__root__";
+      m.set(key, [...(m.get(key) || []), t]);
+    }
+    return m;
+  }, [todos]);
+
+  const filteredRoots = useMemo(() => {
+    const roots = byParent.get("__root__") || [];
+    if (filter === "전체") return roots;
+    if (filter === "반복만") return roots.filter((t) => !!t.repeat);
     const now = new Date();
     const weekEnd = new Date(now);
     weekEnd.setDate(now.getDate() + (7 - now.getDay()));
-    return todos.filter((t) => {
+    return roots.filter((t) => {
       if (!t.dueAt) return false;
       const d = new Date(t.dueAt);
       if (filter === "오늘") return isSameDay(d, now);
       if (filter === "이번 주") return d >= new Date(now.getFullYear(), now.getMonth(), now.getDate()) && d <= weekEnd;
       return true;
     });
-  }, [todos, filter]);
+  }, [byParent, filter]);
 
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();
-  const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7; // Mon=0
+  const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const eventsByDay = new Map<number, TodoItem[]>();
   for (const t of todos) {
@@ -83,16 +276,10 @@ export function TodosClient({ todos, canWrite }: { todos: TodoItem[]; canWrite: 
     <>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
         <div style={{ display: "flex", padding: 2, gap: 2, border: "1px solid var(--line)", borderRadius: 8, background: "var(--panel2)" }}>
-          <button
-            onClick={() => setView("list")}
-            style={{ padding: "5px 13px", border: 0, borderRadius: 6, fontSize: 12.5, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap", background: listBg, color: listFg }}
-          >
+          <button onClick={() => setView("list")} style={{ padding: "5px 13px", border: 0, borderRadius: 6, fontSize: 12.5, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap", background: listBg, color: listFg }}>
             리스트
           </button>
-          <button
-            onClick={() => setView("cal")}
-            style={{ padding: "5px 13px", border: 0, borderRadius: 6, fontSize: 12.5, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap", background: calBg, color: calFg }}
-          >
+          <button onClick={() => setView("cal")} style={{ padding: "5px 13px", border: 0, borderRadius: 6, fontSize: 12.5, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap", background: calBg, color: calFg }}>
             캘린더
           </button>
         </div>
@@ -103,16 +290,7 @@ export function TodosClient({ todos, canWrite }: { todos: TodoItem[]; canWrite: 
               <button
                 key={f}
                 onClick={() => setFilter(f)}
-                style={{
-                  padding: "5px 11px",
-                  border: `1px solid ${on ? "var(--accent)" : "var(--line)"}`,
-                  borderRadius: 999,
-                  background: on ? "var(--accent-soft)" : "var(--panel)",
-                  color: on ? "var(--accent)" : "var(--ink2)",
-                  fontSize: 12,
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                }}
+                style={{ padding: "5px 11px", border: `1px solid ${on ? "var(--accent)" : "var(--line)"}`, borderRadius: 999, background: on ? "var(--accent-soft)" : "var(--panel)", color: on ? "var(--accent)" : "var(--ink2)", fontSize: 12, cursor: "pointer", whiteSpace: "nowrap" }}
               >
                 {f}
               </button>
@@ -147,6 +325,17 @@ export function TodosClient({ todos, canWrite }: { todos: TodoItem[]; canWrite: 
             <option value="개인">개인</option>
             <option value="마감">마감</option>
           </select>
+          <select name="priority" defaultValue="2" style={{ height: 32, border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel2)", color: "var(--ink)", fontSize: 12.5 }}>
+            <option value="1">우선순위: 높음</option>
+            <option value="2">우선순위: 보통</option>
+            <option value="3">우선순위: 낮음</option>
+          </select>
+          <textarea
+            name="description"
+            placeholder="설명 (선택)"
+            rows={1}
+            style={{ flex: "1 1 100%", padding: 9, border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel2)", color: "var(--ink)", fontSize: 12.5, resize: "vertical", fontFamily: "inherit" }}
+          />
           <button type="submit" style={{ height: 32, padding: "0 14px", border: 0, borderRadius: 6, background: "var(--accent)", color: "var(--on-accent)", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>
             추가
           </button>
@@ -154,82 +343,21 @@ export function TodosClient({ todos, canWrite }: { todos: TodoItem[]; canWrite: 
       )}
 
       {view === "list" && (
-        <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 10, overflowX: "auto" }}>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "26px minmax(200px,1fr) 108px 100px 104px 84px 30px",
-              gap: 10,
-              padding: "9px 15px",
-              minWidth: 780,
-              background: "var(--panel2)",
-              borderBottom: "1px solid var(--line)",
-              fontSize: 11,
-              fontWeight: 600,
-              letterSpacing: ".04em",
-              color: "var(--ink3)",
-            }}
-          >
-            <div></div>
-            <div>제목</div>
-            <div>프로젝트</div>
-            <div>마감일</div>
-            <div>반복</div>
-            <div>분류</div>
-            <div></div>
-          </div>
-          {filteredTodos.length === 0 && <div style={{ padding: "24px 15px", fontSize: 12.5, color: "var(--ink3)" }}>표시할 할일이 없습니다.</div>}
-          {filteredTodos.map((t) => {
-            const [tagBg, tagFg] = CHIP[t.tag] || CHIP.개인;
-            return (
-              <div
-                key={t.id}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "26px minmax(200px,1fr) 108px 100px 104px 84px 30px",
-                  gap: 10,
-                  alignItems: "center",
-                  padding: "9px 15px",
-                  minWidth: 780,
-                  borderBottom: "1px solid var(--line2)",
-                }}
-              >
-                <TodoCheckbox id={t.id} done={t.done} canWrite={canWrite} />
-                <div
-                  style={{
-                    minWidth: 0,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    fontSize: 13,
-                    color: t.done ? "var(--ink3)" : "var(--ink)",
-                    textDecoration: t.done ? "line-through" : "none",
-                  }}
-                >
-                  {t.title}
-                </div>
-                <div style={{ fontSize: 12, color: "var(--ink2)" }}>{t.project || "—"}</div>
-                <div style={{ fontFamily: "var(--font-mono), monospace", fontSize: 11.5, color: "var(--ink3)" }}>
-                  {t.dueAt ? new Date(t.dueAt).toLocaleDateString("ko-KR", { month: "2-digit", day: "2-digit" }) : "—"}
-                </div>
-                <div style={{ fontFamily: "var(--font-mono), monospace", fontSize: 11.5, color: "var(--ink3)" }}>{t.repeat || "—"}</div>
-                <div>
-                  <span style={{ fontSize: 10.5, fontWeight: 500, padding: "2px 8px", borderRadius: 999, background: tagBg, color: tagFg }}>{t.tag}</span>
-                </div>
-                {canWrite ? (
-                  <button
-                    onClick={() => startTransition(() => deleteTodoAction(t.id))}
-                    title="삭제"
-                    style={{ width: 22, height: 22, border: 0, background: "transparent", color: "var(--ink3)", cursor: "pointer", fontSize: 12 }}
-                  >
-                    ✕
-                  </button>
-                ) : (
-                  <div />
-                )}
-              </div>
-            );
-          })}
+        <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 10, overflow: "hidden" }}>
+          {filteredRoots.length === 0 && <div style={{ padding: "24px 15px", fontSize: 12.5, color: "var(--ink3)" }}>표시할 할일이 없습니다.</div>}
+          {filteredRoots.map((t) => (
+            <TodoRow
+              key={t.id}
+              todo={t}
+              depth={0}
+              byParent={byParent}
+              canWrite={canWrite}
+              editingId={editingId}
+              setEditingId={setEditingId}
+              addingParentId={addingParentId}
+              setAddingParentId={setAddingParentId}
+            />
+          ))}
         </div>
       )}
 
@@ -252,13 +380,7 @@ export function TodosClient({ todos, canWrite }: { todos: TodoItem[]; canWrite: 
             {calDays.map((d, i) => (
               <div
                 key={i}
-                style={{
-                  minHeight: 80,
-                  padding: "6px 8px",
-                  borderRight: "1px solid var(--line2)",
-                  borderBottom: "1px solid var(--line2)",
-                  background: d.today ? "var(--accent-soft)" : d.inMonth ? "var(--panel)" : "var(--panel2)",
-                }}
+                style={{ minHeight: 80, padding: "6px 8px", borderRight: "1px solid var(--line2)", borderBottom: "1px solid var(--line2)", background: d.today ? "var(--accent-soft)" : d.inMonth ? "var(--panel)" : "var(--panel2)" }}
               >
                 <div style={{ fontFamily: "var(--font-mono), monospace", fontSize: 11.5, fontWeight: d.today ? 700 : 400, color: d.today ? "var(--accent)" : d.inMonth ? "var(--ink2)" : "var(--ink3)", marginBottom: 5 }}>
                   {d.inMonth ? d.day : ""}

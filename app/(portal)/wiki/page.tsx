@@ -1,7 +1,7 @@
 import { pageAccess } from "@/lib/guard";
 import { Denied } from "@/components/Denied";
 import { prisma } from "@/lib/prisma";
-import { renderMarkdown } from "@/lib/markdown";
+import { renderNote } from "@/lib/markdown";
 import { WikiEditor } from "@/components/WikiEditor";
 import { WikiSidebar } from "@/components/WikiSidebar";
 
@@ -27,10 +27,11 @@ export default async function WikiPage({ searchParams }: { searchParams: Promise
         {selected ? (
           <WikiEditor
             noteId={selected.id}
-            path={`${selected.folder ? selected.folder + " / " : ""}${selected.title}.md`}
+            path={`${selected.folder ? selected.folder + " / " : ""}${selected.title}.${selected.format}`}
             title={selected.title}
+            format={selected.format}
             content={selected.content}
-            html={renderMarkdown(selected.content)}
+            html={renderNote(selected.content, selected.format)}
             updatedAt={selected.updatedAt.toISOString()}
             canWrite={level === 2}
           />
