@@ -49,11 +49,48 @@
 
 ## MCP 연동
 
-외부 MCP 클라이언트(Claude Desktop 등)가 이 포털의 기능(할일/위키/파일/자동화/공유/감사로그)을 도구로 호출할 수 있습니다.
+외부 MCP 클라이언트(Claude Desktop, Claude Code 등)가 이 포털의 기능을 도구로 직접 호출할 수 있습니다. 새 도구를 추가해도 별도 배포 설정 변경은 필요 없습니다 — `lib/mcp/build-server.ts`에 `server.registerTool(...)`만 추가하면 됩니다.
 
-1. `/account` 페이지에서 API 토큰을 발급합니다 (토큰 값은 발급 시 한 번만 표시됨).
-2. MCP 클라이언트에 엔드포인트 `https://<도메인>/mcp` (Streamable HTTP)와 헤더 `Authorization: Bearer <토큰>`을 설정합니다.
-3. 단일 사용자 구조이므로 유효한 토큰이면 모든 도구에 전체 접근 권한을 갖습니다 (세션을 유지하지 않는 stateless 방식).
+### 연결 방법
+
+1. `/account` 페이지의 **API 토큰** 섹션에서 토큰을 발급합니다 (이름만 붙이면 되고, 토큰 값은 발급 시 한 번만 표시되니 바로 복사해두세요).
+2. MCP 클라이언트에 다음을 설정합니다:
+   - **엔드포인트**: `https://<도메인>/mcp` (Streamable HTTP 전송)
+   - **헤더**: `Authorization: Bearer <발급받은 토큰>`
+3. 세션을 유지하지 않는 stateless 방식이라, 요청마다 토큰을 새로 검증합니다 — 별도 로그인 절차 없이 토큰만 유효하면 바로 호출됩니다. 단일 사용자 구조이므로 토큰이 유효하면 아래 도구 전부에 접근할 수 있습니다.
+4. 토큰을 더 이상 쓰지 않으면 `/account`에서 **취소**하세요 (사용 이력은 감사 로그에 `via: "mcp"`로 남는 액션들로 확인 가능).
+
+### 제공 도구 (25개)
+
+| 분류 | 도구 | 설명 |
+|---|---|---|
+| 할일 | `list_todos` | 할일 목록 조회 (완료 여부/상위 할일 ID로 필터) |
+| | `create_todo` | 할일 생성 (하위 할일은 `parentId` 지정) |
+| | `update_todo` | 제목·설명·프로젝트·태그·반복·마감일·우선순위·완료 여부 수정 |
+| | `delete_todo` | 삭제 (하위 할일도 함께 삭제) |
+| 위키 | `list_notes` | 문서 목록 조회 (폴더로 필터) |
+| | `get_note` | 문서 전체 내용 조회 |
+| | `create_note` | 문서 생성 (`format`: `md` 또는 `html`) |
+| | `update_note` | 문서 내용 수정 |
+| | `delete_note` | 문서 삭제 |
+| 파일 | `list_files` | `SYNC_FOLDER_PATH` 폴더 내용 나열 |
+| | `read_file` | 텍스트 파일 읽기 (최대 200KB, 바이너리 미지원) |
+| | `write_file` | 텍스트 파일 생성/덮어쓰기 |
+| | `delete_file` | 파일/폴더 삭제 |
+| | `rename_file` | 이름 변경/이동 |
+| | `mkdir` | 폴더 생성 |
+| 공유 | `create_share_link` | 공유 링크 생성 (`scope`: `public` 또는 `email_otp` + `email`) |
+| | `list_share_links` | 특정 파일의 활성 공유 링크 조회 |
+| | `revoke_share_link` | 공유 링크 취소 |
+| 자동화 | `list_scripts` | 등록된 화이트리스트 스크립트 + 최근 실행 상태 |
+| | `run_script` | 스크립트 실행 |
+| | `get_run_logs` | 실행 로그 조회 (스크립트/개수로 필터) |
+| 코드 에디터 | `read_script_file` | 스크립트 소스 읽기 |
+| | `write_script_file` | 스크립트 소스 저장 |
+| | `list_script_files` | `SCRIPTS_PATH`의 파일 목록 |
+| 감사 로그 | `list_audit_log` | 계정·스크립트·파일·공유 변경 이력 조회 |
+
+각 도구는 웹 UI가 호출하는 것과 동일한 `lib/` 함수(파일 경로 안전 검사, 화이트리스트 스크립트 검증, 감사 로그 기록 등)를 그대로 거치므로 동작·안전장치가 웹과 동일합니다. 지식베이스 문서는 파일 도구가 아니라 `list_notes`/`get_note`/`create_note`/`update_note`/`delete_note`로 다루세요 (파일 브라우저의 가상 폴더는 읽기 전용 뷰일 뿐입니다). 계정 추가나 접근 권한을 다루는 도구는 없습니다 — 단일 사용자 구조라 그런 개념 자체가 없습니다.
 
 ## 로컬 개발 환경 실행
 
