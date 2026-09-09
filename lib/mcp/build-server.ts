@@ -25,10 +25,14 @@ export function buildMcpServer(user: CurrentUser): McpServer {
   // ---------- todos ----------
   server.registerTool(
     "list_todos",
-    { title: "할일 목록", description: "할일 목록을 조회합니다.", inputSchema: { done: z.boolean().optional(), parentId: z.string().nullable().optional() } },
-    async ({ done, parentId }) => {
+    {
+      title: "할일 목록",
+      description: "할일 목록을 조회합니다.",
+      inputSchema: { status: z.enum(["todo", "in_progress", "done"]).optional(), parentId: z.string().nullable().optional() },
+    },
+    async ({ status, parentId }) => {
       const where: Record<string, unknown> = {};
-      if (done !== undefined) where.done = done;
+      if (status !== undefined) where.status = status;
       if (parentId !== undefined) where.parentId = parentId;
       const todos = await prisma.todo.findMany({ where, orderBy: { order: "asc" } });
       return ok(todos);
@@ -47,6 +51,7 @@ export function buildMcpServer(user: CurrentUser): McpServer {
         tag: z.enum(["업무", "반복", "개인", "마감"]).optional(),
         repeat: z.string().optional(),
         dueAt: z.string().optional().describe("ISO date, e.g. 2026-09-10"),
+        status: z.enum(["todo", "in_progress", "done"]).optional().describe("칸반 상태. 기본값 todo."),
         parentId: z.string().optional(),
       },
     },
@@ -61,6 +66,7 @@ export function buildMcpServer(user: CurrentUser): McpServer {
           tag: args.tag || "업무",
           repeat: args.repeat || null,
           dueAt: args.dueAt ? new Date(args.dueAt) : null,
+          status: args.status || "todo",
           order: (last?.order ?? 0) + 1000,
           parentId,
           ownerId: user.id,
@@ -83,7 +89,7 @@ export function buildMcpServer(user: CurrentUser): McpServer {
         tag: z.enum(["업무", "반복", "개인", "마감"]).optional(),
         repeat: z.string().optional(),
         dueAt: z.string().nullable().optional(),
-        done: z.boolean().optional(),
+        status: z.enum(["todo", "in_progress", "done"]).optional(),
       },
     },
     async ({ id, dueAt, ...rest }) => {

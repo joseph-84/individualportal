@@ -14,7 +14,7 @@ export async function getNotificationsAction(): Promise<NotificationItem[]> {
   const items: NotificationItem[] = [];
 
   const overdue = await prisma.todo.findMany({
-    where: { done: false, dueAt: { lt: new Date() } },
+    where: { status: { not: "done" }, dueAt: { lt: new Date() } },
     orderBy: { dueAt: "asc" },
     take: 5,
   });
