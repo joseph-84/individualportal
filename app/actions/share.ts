@@ -18,7 +18,6 @@ export interface CreateShareState {
 
 export async function createShareLinkAction(relPath: string, scope: ShareScope, email?: string): Promise<CreateShareState> {
   const user = await requireUser();
-  if (relPath.startsWith("__kb__")) return { error: "지식베이스 문서는 공유할 수 없습니다." };
   if (scope !== "email_otp" && scope !== "public") return { error: "잘못된 공개 범위입니다." };
   if (scope === "email_otp") {
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "올바른 이메일 주소를 입력하세요." };

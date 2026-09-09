@@ -409,14 +409,16 @@ export function FilesBrowser({
                 ↓ 다운로드
               </a>
             )}
+            {canWrite && (
+              <button
+                onClick={() => setSharing(true)}
+                style={{ height: 27, padding: "0 10px", border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel2)", color: "var(--ink2)", fontSize: 11.5, cursor: "pointer" }}
+              >
+                공유
+              </button>
+            )}
             {writable && (
               <>
-                <button
-                  onClick={() => setSharing(true)}
-                  style={{ height: 27, padding: "0 10px", border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel2)", color: "var(--ink2)", fontSize: 11.5, cursor: "pointer" }}
-                >
-                  공유
-                </button>
                 <button
                   onClick={renameSelected}
                   style={{ height: 27, padding: "0 10px", border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel2)", color: "var(--ink2)", fontSize: 11.5, cursor: "pointer" }}

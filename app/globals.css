@@ -132,11 +132,17 @@ select {
   border-collapse: collapse;
   margin: 0 0 16px;
   font-size: 0.95em;
+  max-width: 100%;
 }
 .wiki-content th,
 .wiki-content td {
   border: 1px solid var(--line);
   padding: 6px 10px;
+}
+.wiki-content img,
+.wiki-content svg {
+  max-width: 100%;
+  height: auto;
 }
 
 @keyframes pulse {
