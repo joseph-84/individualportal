@@ -13,7 +13,7 @@ export default async function WikiPage({ searchParams }: { searchParams: Promise
   const tags = Array.from(new Set(notes.flatMap((n) => n.tags))).sort();
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "226px minmax(340px,1fr)", gap: 12, alignItems: "start", overflowX: "auto" }}>
+    <div className="wiki-grid" style={{ display: "grid", gridTemplateColumns: "226px minmax(340px,1fr)", gap: 12, alignItems: "start", overflowX: "auto" }}>
       <WikiSidebar
         notes={notes.map((n) => ({ id: n.id, title: n.title, folder: n.folder, tags: n.tags }))}
         tags={tags}

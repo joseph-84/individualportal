@@ -52,7 +52,7 @@ export default async function AutomationPage() {
         />
       </div>
 
-      <section style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 10, overflow: "hidden", position: "sticky", top: 70 }}>
+      <section className="automation-log" style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 10, overflow: "hidden", position: "sticky", top: 70 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 15px", borderBottom: "1px solid var(--line)" }}>
           <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap" }}>실행 로그</div>
           {canRun && <ClearLogsButton />}

@@ -154,3 +154,118 @@ select {
     opacity: 0.3;
   }
 }
+
+/* ---------- Responsive layout ----------
+ * Most of the app is styled with inline `style={{...}}` objects, which can't respond to media
+ * queries on their own. Below MOBILE_BREAKPOINT, these rules override specific inline styles
+ * with `!important` (the one legitimate use of it here) rather than refactoring every page to
+ * CSS classes. Desktop (>860px) is completely untouched by any rule in this block.
+ */
+
+.app-hamburger {
+  display: none;
+}
+.app-sidebar-close {
+  display: none;
+}
+.app-sidebar-backdrop {
+  display: none;
+}
+
+@media (max-width: 860px) {
+  .app-shell {
+    grid-template-columns: 1fr !important;
+  }
+
+  .app-hamburger {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+  }
+  .app-sidebar-close {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .app-sidebar {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    height: 100vh !important;
+    width: 240px;
+    z-index: 60;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+    box-shadow: none;
+  }
+  .app-sidebar[data-open="true"] {
+    transform: translateX(0);
+    box-shadow: 16px 0 32px rgba(0, 0, 0, 0.28);
+  }
+  .app-sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 55;
+  }
+
+  /* File browser / wiki / code editor: fixed-width side columns stack above the content. */
+  .fb-grid,
+  .wiki-grid,
+  .editor-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .fb-tree,
+  .wiki-sidebar {
+    position: static !important;
+    max-height: none !important;
+    top: auto !important;
+  }
+
+  /* Automation page: don't let the log panel stick while stacked under the script list. */
+  .automation-log {
+    position: static !important;
+    top: auto !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .login-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .login-panel-right {
+    display: none !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .login-grid > div:first-child {
+    padding: 32px 22px !important;
+  }
+}
+
+@media (max-width: 560px) {
+  .app-header {
+    padding: 0 10px !important;
+    gap: 8px !important;
+  }
+  .app-header-subtitle {
+    display: none !important;
+  }
+  .app-header-search-trigger {
+    width: 118px !important;
+  }
+  .app-header-search-hint {
+    display: none !important;
+  }
+  .app-header-search-results {
+    position: fixed !important;
+    top: 58px !important;
+    left: 10px !important;
+    right: 10px !important;
+    width: auto !important;
+  }
+}

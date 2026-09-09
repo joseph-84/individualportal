@@ -17,7 +17,7 @@ export function LoginScreen() {
 
   return (
     <div data-theme={theme} style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--ink)", fontSize: 13.5 }}>
-      <div style={{ minHeight: "100vh", display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)" }}>
+      <div className="login-grid" style={{ minHeight: "100vh", display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "48px 40px" }}>
           <form action={formAction} style={{ width: "100%", maxWidth: 336 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 36 }}>
@@ -113,6 +113,7 @@ export function LoginScreen() {
           </form>
         </div>
         <div
+          className="login-panel-right"
           style={{
             background: "var(--panel)",
             borderLeft: "1px solid var(--line)",

@@ -7,6 +7,7 @@ export function ThemedShell({ children }: { children: React.ReactNode }) {
   return (
     <div
       data-theme={theme}
+      className="app-shell"
       style={{
         minHeight: "100vh",
         background: "var(--bg)",

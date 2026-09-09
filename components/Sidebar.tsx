@@ -4,27 +4,33 @@ import { useRouter, usePathname } from "next/navigation";
 import { PAGES } from "@/lib/constants";
 import { pageKeyToPath, pathToPageKey } from "@/lib/routing";
 import { logoutAction } from "@/app/actions/auth";
+import { useMobileNav } from "@/lib/mobile-nav-context";
 import { Icon } from "./Icon";
 
 export function Sidebar({ userName }: { userName: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const current = pathToPageKey(pathname);
+  const { open, close } = useMobileNav();
 
   return (
-    <aside
-      style={{
-        background: "var(--panel)",
-        borderRight: "1px solid var(--line)",
-        display: "flex",
-        flexDirection: "column",
-        padding: "12px 10px",
-        gap: 3,
-        position: "sticky",
-        top: 0,
-        height: "100vh",
-      }}
-    >
+    <>
+      {open && <div className="app-sidebar-backdrop" onClick={close} />}
+      <aside
+        className="app-sidebar"
+        data-open={open}
+        style={{
+          background: "var(--panel)",
+          borderRight: "1px solid var(--line)",
+          display: "flex",
+          flexDirection: "column",
+          padding: "12px 10px",
+          gap: 3,
+          position: "sticky",
+          top: 0,
+          height: "100vh",
+        }}
+      >
       <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "5px 8px 14px" }}>
         <div
           style={{
@@ -42,6 +48,14 @@ export function Sidebar({ userName }: { userName: string }) {
           P
         </div>
         <div style={{ fontWeight: 600, fontSize: 13.5, letterSpacing: "-.01em" }}>Portal</div>
+        <button
+          onClick={close}
+          className="app-sidebar-close"
+          aria-label="메뉴 닫기"
+          style={{ marginLeft: "auto", width: 26, height: 26, border: 0, background: "transparent", color: "var(--ink3)", fontSize: 15, cursor: "pointer" }}
+        >
+          ✕
+        </button>
       </div>
       <div
         style={{
@@ -159,6 +173,7 @@ export function Sidebar({ userName }: { userName: string }) {
           </button>
         </form>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

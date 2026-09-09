@@ -449,6 +449,8 @@ export function TodosClient({ todos, canWrite, googleEvents = [] }: { todos: Tod
             </div>
             <div style={{ marginLeft: "auto", fontSize: 11.5, color: "var(--ink3)" }}>마감일(dueAt)이 설정된 할일만 표시됩니다</div>
           </div>
+          <div style={{ overflowX: "auto" }}>
+          <div style={{ minWidth: 560 }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0,1fr))", background: "var(--panel2)", borderBottom: "1px solid var(--line2)" }}>
             {["월", "화", "수", "목", "금", "토", "일"].map((w) => (
               <div key={w} style={{ padding: "7px 10px", fontSize: 11, fontWeight: 600, color: "var(--ink3)" }}>
@@ -498,6 +500,8 @@ export function TodosClient({ todos, canWrite, googleEvents = [] }: { todos: Tod
                 ))}
               </div>
             ))}
+          </div>
+          </div>
           </div>
         </div>
       )}

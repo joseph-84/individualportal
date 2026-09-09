@@ -63,6 +63,7 @@ export function HeaderSearch() {
     <div ref={containerRef} style={{ position: "relative", flex: "none" }}>
       <div
         onClick={() => setOpen(true)}
+        className="app-header-search-trigger"
         style={{
           display: "flex",
           alignItems: "center",
@@ -89,11 +90,12 @@ export function HeaderSearch() {
           placeholder="검색"
           style={{ border: 0, outline: "none", background: "transparent", color: "var(--ink)", fontSize: 12.5, flex: 1, minWidth: 0 }}
         />
-        <span style={{ fontFamily: "var(--font-mono), monospace", fontSize: 10.5 }}>⌘K</span>
+        <span className="app-header-search-hint" style={{ fontFamily: "var(--font-mono), monospace", fontSize: 10.5 }}>⌘K</span>
       </div>
 
       {open && query.trim().length >= 2 && (
         <div
+          className="app-header-search-results"
           style={{
             position: "absolute",
             top: 36,

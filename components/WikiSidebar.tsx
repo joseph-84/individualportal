@@ -57,7 +57,7 @@ export function WikiSidebar({ notes, tags, selectedId, canWrite }: { notes: Note
   }, [filtered]);
 
   return (
-    <aside style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 10, padding: 10, position: "sticky", top: 70 }}>
+    <aside className="wiki-sidebar" style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 10, padding: 10, position: "sticky", top: 70 }}>
       <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
         <div
           style={{
