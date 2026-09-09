@@ -391,6 +391,22 @@ function KanbanCard({
           </div>
         )}
       </div>
+      {todo.description && (
+        <div
+          style={{
+            fontSize: 11,
+            color: "var(--ink3)",
+            marginTop: 4,
+            whiteSpace: "pre-wrap",
+            display: "-webkit-box",
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+          }}
+        >
+          {todo.description}
+        </div>
+      )}
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
         <span style={{ fontSize: 10, fontWeight: 500, padding: "1px 7px", borderRadius: 999, background: tagBg, color: tagFg }}>{todo.tag}</span>
         {todo.dueAt && (
