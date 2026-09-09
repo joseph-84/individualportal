@@ -21,7 +21,7 @@ export default async function DashboardPage() {
 
   const [todos, incompleteCount, notes, runs, weekRuns, errRuns, files] = await Promise.all([
     prisma.todo.findMany({ where: { parentId: null }, orderBy: { order: "asc" }, take: 5 }),
-    prisma.todo.count({ where: { done: false } }),
+    prisma.todo.count({ where: { status: { not: "done" } } }),
     prisma.note.findMany({ orderBy: { updatedAt: "desc" }, take: 4 }),
     prisma.scriptRun.findMany({ orderBy: { startedAt: "desc" }, take: 5, include: { script: true } }),
     prisma.scriptRun.count({ where: { startedAt: { gte: new Date(Date.now() - 7 * 86400000) } } }),
@@ -29,7 +29,7 @@ export default async function DashboardPage() {
     recentFiles(4),
   ]);
 
-  const doneCount = todos.filter((t) => t.done).length;
+  const doneCount = todos.filter((t) => t.status === "done").length;
 
   const kpis = [
     { label: "미완료 할일", value: String(incompleteCount), kind: "err" as const },
@@ -68,7 +68,7 @@ export default async function DashboardPage() {
             const [tagBg, tagFg] = CHIP[t.tag || "개인"] || CHIP.개인;
             return (
               <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 15px", borderBottom: "1px solid var(--line2)" }}>
-                <TodoCheckbox id={t.id} done={t.done} canWrite={level === 2} />
+                <TodoCheckbox id={t.id} done={t.status === "done"} canWrite={level === 2} />
                 <div
                   style={{
                     flex: 1,
@@ -77,8 +77,8 @@ export default async function DashboardPage() {
                     textOverflow: "ellipsis",
                     whiteSpace: "nowrap",
                     fontSize: 13,
-                    color: t.done ? "var(--ink3)" : "var(--ink)",
-                    textDecoration: t.done ? "line-through" : "none",
+                    color: t.status === "done" ? "var(--ink3)" : "var(--ink)",
+                    textDecoration: t.status === "done" ? "line-through" : "none",
                   }}
                 >
                   {t.title}

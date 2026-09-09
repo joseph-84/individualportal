@@ -47,7 +47,7 @@ model Todo {
   tag         String?
   repeat      String?
   dueAt       DateTime?
-  done        Boolean   @default(false)
+  status      String    @default("todo") // "todo" | "in_progress" | "done" -- kanban column
   order       Float     @default(0) // manual drag-and-drop order among siblings (same parentId)
   ownerId     String
   owner       User      @relation(fields: [ownerId], references: [id])

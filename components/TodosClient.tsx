@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition, useActionState } from "react";
-import { createTodoAction, deleteTodoAction, editTodoAction, reorderTodoAction, type EditTodoState } from "@/app/actions/todos";
+import { createTodoAction, deleteTodoAction, editTodoAction, reorderTodoAction, moveTodoAction, type EditTodoState } from "@/app/actions/todos";
 import { TodoCheckbox } from "./TodoCheckbox";
 
 interface TodoItem {
@@ -11,7 +11,7 @@ interface TodoItem {
   project: string | null;
   repeat: string | null;
   tag: string;
-  done: boolean;
+  status: string;
   order: number;
   parentId: string | null;
   dueAt: string | null;
@@ -24,6 +24,16 @@ const CHIP: Record<string, [string, string]> = {
   마감: ["var(--err-soft)", "var(--err)"],
 };
 
+const STATUS_COLUMNS = [
+  { key: "todo", label: "할 일" },
+  { key: "in_progress", label: "진행중" },
+  { key: "done", label: "완료" },
+] as const;
+const STATUS_LABEL: Record<string, string> = { todo: "할 일", in_progress: "진행중", done: "완료" };
+const STATUS_BADGE: Record<string, [string, string]> = {
+  in_progress: ["var(--warn-soft)", "var(--warn)"],
+};
+
 function seg(on: boolean): [string, string] {
   return on ? ["var(--panel)", "var(--ink)"] : ["transparent", "var(--ink2)"];
 }
@@ -33,6 +43,18 @@ type Filter = (typeof FILTERS)[number];
 
 function isSameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+function StatusSelect({ defaultValue }: { defaultValue: string }) {
+  return (
+    <select name="status" defaultValue={defaultValue} style={{ height: 30, border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel)", color: "var(--ink)", fontSize: 12.5 }}>
+      {STATUS_COLUMNS.map((s) => (
+        <option key={s.key} value={s.key}>
+          {s.label}
+        </option>
+      ))}
+    </select>
+  );
 }
 
 const initialEdit: EditTodoState = {};
@@ -65,6 +87,7 @@ function EditTodoForm({ todo, onDone }: { todo: TodoItem; onDone: () => void }) 
           <option value="개인">개인</option>
           <option value="마감">마감</option>
         </select>
+        <StatusSelect defaultValue={todo.status} />
       </div>
       {state.error && <div style={{ fontSize: 12, color: "var(--err)" }}>{state.error}</div>}
       <div style={{ display: "flex", gap: 6 }}>
@@ -116,6 +139,7 @@ function TodoRow({
   const [collapsed, setCollapsed] = useState(false);
   const [, startTransition] = useTransition();
   const [tagBg, tagFg] = CHIP[todo.tag] || CHIP.개인;
+  const done = todo.status === "done";
   const editing = editingId === todo.id;
   const adding = addingParentId === todo.id;
   const children = byParent.get(todo.id) || [];
@@ -173,10 +197,10 @@ function TodoRow({
           <span style={{ width: 16, flex: "none" }} />
         )}
         <div style={{ marginTop: 2 }}>
-          <TodoCheckbox id={todo.id} done={todo.done} canWrite={canWrite} />
+          <TodoCheckbox id={todo.id} done={done} canWrite={canWrite} />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, color: todo.done ? "var(--ink3)" : "var(--ink)", textDecoration: todo.done ? "line-through" : "none" }}>{todo.title}</div>
+          <div style={{ fontSize: 13, color: done ? "var(--ink3)" : "var(--ink)", textDecoration: done ? "line-through" : "none" }}>{todo.title}</div>
           {todo.description && <div style={{ fontSize: 11.5, color: "var(--ink3)", marginTop: 2, whiteSpace: "pre-wrap" }}>{todo.description}</div>}
           <div style={{ display: "flex", gap: 8, marginTop: 3, fontSize: 11, color: "var(--ink3)", fontFamily: "var(--font-mono), monospace" }}>
             {todo.project && <span>{todo.project}</span>}
@@ -184,6 +208,21 @@ function TodoRow({
             {todo.repeat && <span>↻{todo.repeat}</span>}
           </div>
         </div>
+        {STATUS_BADGE[todo.status] && (
+          <span
+            style={{
+              fontSize: 10.5,
+              fontWeight: 500,
+              padding: "2px 8px",
+              borderRadius: 999,
+              background: STATUS_BADGE[todo.status][0],
+              color: STATUS_BADGE[todo.status][1],
+              flex: "none",
+            }}
+          >
+            {STATUS_LABEL[todo.status]}
+          </span>
+        )}
         <span style={{ fontSize: 10.5, fontWeight: 500, padding: "2px 8px", borderRadius: 999, background: tagBg, color: tagFg, flex: "none" }}>{todo.tag}</span>
         {canWrite && (
           <div style={{ display: "flex", gap: 4, flex: "none" }}>
@@ -251,6 +290,180 @@ function TodoRow({
   );
 }
 
+interface KanbanDragState {
+  id: string;
+  status: string;
+}
+interface KanbanDropTarget {
+  id: string;
+  status: string;
+  pos: "before" | "after";
+}
+
+function KanbanCard({
+  todo,
+  canWrite,
+  dragged,
+  setDragged,
+  dropTarget,
+  setDropTarget,
+  editingId,
+  setEditingId,
+  onDropOnCard,
+}: {
+  todo: TodoItem;
+  canWrite: boolean;
+  dragged: KanbanDragState | null;
+  setDragged: (d: KanbanDragState | null) => void;
+  dropTarget: KanbanDropTarget | null;
+  setDropTarget: (d: KanbanDropTarget | null) => void;
+  editingId: string | null;
+  setEditingId: (id: string | null) => void;
+  onDropOnCard: (targetId: string, status: string, pos: "before" | "after") => void;
+}) {
+  const [, startTransition] = useTransition();
+  const [tagBg, tagFg] = CHIP[todo.tag] || CHIP.개인;
+  const canAcceptDrop = canWrite && dragged && dragged.id !== todo.id;
+  const isTop = canAcceptDrop && dropTarget?.id === todo.id && dropTarget.pos === "before";
+  const isBottom = canAcceptDrop && dropTarget?.id === todo.id && dropTarget.pos === "after";
+
+  if (editingId === todo.id) {
+    return <EditTodoForm todo={todo} onDone={() => setEditingId(null)} />;
+  }
+
+  return (
+    <div
+      draggable={canWrite}
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = "move";
+        setDragged({ id: todo.id, status: todo.status });
+      }}
+      onDragEnd={() => {
+        setDragged(null);
+        setDropTarget(null);
+      }}
+      onDragOver={(e) => {
+        if (!canAcceptDrop) return;
+        e.preventDefault();
+        const rect = e.currentTarget.getBoundingClientRect();
+        const pos = e.clientY - rect.top < rect.height / 2 ? "before" : "after";
+        if (dropTarget?.id !== todo.id || dropTarget.pos !== pos) setDropTarget({ id: todo.id, status: todo.status, pos });
+      }}
+      onDrop={(e) => {
+        if (!canAcceptDrop || !dropTarget) return;
+        e.preventDefault();
+        e.stopPropagation();
+        onDropOnCard(todo.id, todo.status, dropTarget.pos);
+      }}
+      style={{
+        background: "var(--panel)",
+        border: "1px solid var(--line)",
+        borderRadius: 8,
+        padding: "9px 10px",
+        marginBottom: 6,
+        cursor: canWrite ? "grab" : "default",
+        opacity: dragged?.id === todo.id ? 0.4 : 1,
+        boxShadow: isTop ? "0 -3px 0 var(--accent)" : isBottom ? "0 3px 0 var(--accent)" : "none",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
+        <div style={{ fontSize: 12.5, flex: 1, minWidth: 0, color: todo.status === "done" ? "var(--ink3)" : "var(--ink)", textDecoration: todo.status === "done" ? "line-through" : "none" }}>
+          {todo.title}
+        </div>
+        {canWrite && (
+          <div style={{ display: "flex", gap: 3, flex: "none" }}>
+            <button onClick={() => setEditingId(todo.id)} title="편집" style={{ width: 19, height: 19, border: 0, background: "transparent", color: "var(--ink3)", cursor: "pointer", fontSize: 10.5 }}>
+              ✎
+            </button>
+            <button
+              onClick={() => confirm(`"${todo.title}"을(를) 삭제할까요?`) && startTransition(() => deleteTodoAction(todo.id))}
+              title="삭제"
+              style={{ width: 19, height: 19, border: 0, background: "transparent", color: "var(--ink3)", cursor: "pointer", fontSize: 10.5 }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 10, fontWeight: 500, padding: "1px 7px", borderRadius: 999, background: tagBg, color: tagFg }}>{todo.tag}</span>
+        {todo.dueAt && (
+          <span style={{ fontSize: 10.5, color: "var(--ink3)", fontFamily: "var(--font-mono), monospace" }}>
+            {new Date(todo.dueAt).toLocaleDateString("ko-KR", { month: "2-digit", day: "2-digit" })}
+          </span>
+        )}
+        {todo.repeat && <span style={{ fontSize: 10.5, color: "var(--ink3)", fontFamily: "var(--font-mono), monospace" }}>↻{todo.repeat}</span>}
+      </div>
+    </div>
+  );
+}
+
+function KanbanColumn({
+  status,
+  label,
+  cards,
+  canWrite,
+  dragged,
+  setDragged,
+  dropTarget,
+  setDropTarget,
+  editingId,
+  setEditingId,
+  onDropOnCard,
+  onDropOnColumn,
+}: {
+  status: string;
+  label: string;
+  cards: TodoItem[];
+  canWrite: boolean;
+  dragged: KanbanDragState | null;
+  setDragged: (d: KanbanDragState | null) => void;
+  dropTarget: KanbanDropTarget | null;
+  setDropTarget: (d: KanbanDropTarget | null) => void;
+  editingId: string | null;
+  setEditingId: (id: string | null) => void;
+  onDropOnCard: (targetId: string, status: string, pos: "before" | "after") => void;
+  onDropOnColumn: (status: string) => void;
+}) {
+  const canAcceptDrop = canWrite && !!dragged;
+  return (
+    <div
+      onDragOver={(e) => {
+        if (!canAcceptDrop) return;
+        e.preventDefault();
+      }}
+      onDrop={(e) => {
+        if (!canAcceptDrop) return;
+        e.preventDefault();
+        onDropOnColumn(status);
+      }}
+      style={{ background: "var(--panel2)", border: "1px solid var(--line)", borderRadius: 10, padding: 10, minHeight: 160, display: "flex", flexDirection: "column" }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, padding: "0 2px" }}>
+        <span style={{ fontSize: 12.5, fontWeight: 600 }}>{label}</span>
+        <span style={{ fontFamily: "var(--font-mono), monospace", fontSize: 11, color: "var(--ink3)" }}>{cards.length}</span>
+      </div>
+      <div style={{ flex: 1 }}>
+        {cards.map((c) => (
+          <KanbanCard
+            key={c.id}
+            todo={c}
+            canWrite={canWrite}
+            dragged={dragged}
+            setDragged={setDragged}
+            dropTarget={dropTarget}
+            setDropTarget={setDropTarget}
+            editingId={editingId}
+            setEditingId={setEditingId}
+            onDropOnCard={onDropOnCard}
+          />
+        ))}
+        {cards.length === 0 && <div style={{ fontSize: 11.5, color: "var(--ink3)", textAlign: "center", padding: "18px 0" }}>없음</div>}
+      </div>
+    </div>
+  );
+}
+
 interface GoogleCalendarEvent {
   id: string;
   title: string;
@@ -260,16 +473,19 @@ interface GoogleCalendarEvent {
 }
 
 export function TodosClient({ todos, canWrite, googleEvents = [] }: { todos: TodoItem[]; canWrite: boolean; googleEvents?: GoogleCalendarEvent[] }) {
-  const [view, setView] = useState<"list" | "cal">("list");
+  const [view, setView] = useState<"list" | "cal" | "kanban">("list");
   const [showForm, setShowForm] = useState(false);
   const [filter, setFilter] = useState<Filter>("전체");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [addingParentId, setAddingParentId] = useState<string | null>(null);
   const [dragged, setDragged] = useState<DragState | null>(null);
   const [dropTarget, setDropTarget] = useState<{ id: string; pos: "before" | "after" } | null>(null);
+  const [kanbanDragged, setKanbanDragged] = useState<KanbanDragState | null>(null);
+  const [kanbanDropTarget, setKanbanDropTarget] = useState<KanbanDropTarget | null>(null);
   const [, startTransition] = useTransition();
   const [listBg, listFg] = seg(view === "list");
   const [calBg, calFg] = seg(view === "cal");
+  const [kanbanBg, kanbanFg] = seg(view === "kanban");
 
   const byParent = useMemo(() => {
     const m = new Map<string, TodoItem[]>();
@@ -300,6 +516,40 @@ export function TodosClient({ todos, canWrite, googleEvents = [] }: { todos: Tod
     startTransition(() => reorderTodoAction(dragged.id, beforeOrder, afterOrder));
     setDragged(null);
     setDropTarget(null);
+  };
+
+  const kanbanColumns = useMemo(() => {
+    const roots = byParent.get("__root__") || [];
+    const cols: Record<string, TodoItem[]> = { todo: [], in_progress: [], done: [] };
+    for (const t of roots) (cols[t.status] || cols.todo).push(t);
+    return cols;
+  }, [byParent]);
+
+  const moveKanbanCard = (status: string, targetId: string | null, pos: "before" | "after") => {
+    if (!kanbanDragged) return;
+    const list = kanbanColumns[status] || [];
+    let beforeOrder: number | null = null;
+    let afterOrder: number | null = null;
+    if (targetId === null) {
+      const last = list[list.length - 1];
+      beforeOrder = last && last.id !== kanbanDragged.id ? last.order : null;
+      afterOrder = null;
+    } else {
+      const idx = list.findIndex((t) => t.id === targetId);
+      if (idx === -1) return;
+      if (pos === "before") {
+        afterOrder = list[idx].order;
+        const prev = list[idx - 1];
+        beforeOrder = prev && prev.id !== kanbanDragged.id ? prev.order : null;
+      } else {
+        beforeOrder = list[idx].order;
+        const next = list[idx + 1];
+        afterOrder = next && next.id !== kanbanDragged.id ? next.order : null;
+      }
+    }
+    startTransition(() => moveTodoAction(kanbanDragged.id, status, beforeOrder, afterOrder));
+    setKanbanDragged(null);
+    setKanbanDropTarget(null);
   };
 
   const filteredRoots = useMemo(() => {
@@ -359,6 +609,9 @@ export function TodosClient({ todos, canWrite, googleEvents = [] }: { todos: Tod
           <button onClick={() => setView("list")} style={{ padding: "5px 13px", border: 0, borderRadius: 6, fontSize: 12.5, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap", background: listBg, color: listFg }}>
             리스트
           </button>
+          <button onClick={() => setView("kanban")} style={{ padding: "5px 13px", border: 0, borderRadius: 6, fontSize: 12.5, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap", background: kanbanBg, color: kanbanFg }}>
+            칸반
+          </button>
           <button onClick={() => setView("cal")} style={{ padding: "5px 13px", border: 0, borderRadius: 6, fontSize: 12.5, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap", background: calBg, color: calFg }}>
             캘린더
           </button>
@@ -405,6 +658,13 @@ export function TodosClient({ todos, canWrite, googleEvents = [] }: { todos: Tod
             <option value="개인">개인</option>
             <option value="마감">마감</option>
           </select>
+          <select name="status" defaultValue="todo" style={{ height: 32, border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel2)", color: "var(--ink)", fontSize: 12.5 }}>
+            {STATUS_COLUMNS.map((s) => (
+              <option key={s.key} value={s.key}>
+                {s.label}
+              </option>
+            ))}
+          </select>
           <textarea
             name="description"
             placeholder="설명 (선택)"
@@ -438,6 +698,30 @@ export function TodosClient({ todos, canWrite, googleEvents = [] }: { todos: Tod
               onDrop={handleDrop}
             />
           ))}
+        </div>
+      )}
+
+      {view === "kanban" && (
+        <div style={{ overflowX: "auto" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(220px,1fr))", gap: 12, minWidth: 700 }}>
+            {STATUS_COLUMNS.map((s) => (
+              <KanbanColumn
+                key={s.key}
+                status={s.key}
+                label={s.label}
+                cards={kanbanColumns[s.key] || []}
+                canWrite={canWrite}
+                dragged={kanbanDragged}
+                setDragged={setKanbanDragged}
+                dropTarget={kanbanDropTarget}
+                setDropTarget={setKanbanDropTarget}
+                editingId={editingId}
+                setEditingId={setEditingId}
+                onDropOnCard={(targetId, status, pos) => moveKanbanCard(status, targetId, pos)}
+                onDropOnColumn={(status) => moveKanbanCard(status, null, "after")}
+              />
+            ))}
+          </div>
         </div>
       )}
 

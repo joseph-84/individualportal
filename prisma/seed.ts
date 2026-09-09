@@ -24,7 +24,7 @@ async function main() {
     const inDays = (n: number, h = 10) => new Date(today.getFullYear(), today.getMonth(), today.getDate() + n, h, 0);
     await prisma.todo.createMany({
       data: [
-        { title: "주간 리포트 초안 검토", project: "Ops", repeat: "매주 월", tag: "업무", ownerId: admin.id, done: true, dueAt: inDays(-1) },
+        { title: "주간 리포트 초안 검토", project: "Ops", repeat: "매주 월", tag: "업무", ownerId: admin.id, status: "done", dueAt: inDays(-1) },
         { title: "자동화 화이트리스트 정리", project: "Platform", tag: "업무", ownerId: admin.id, dueAt: inDays(1) },
         { title: "백업 무결성 점검", project: "Infra", repeat: "매일", tag: "반복", ownerId: admin.id, dueAt: inDays(0) },
         { title: "위키 온보딩 문서 갱신", project: "Docs", tag: "개인", ownerId: admin.id, dueAt: inDays(3) },
