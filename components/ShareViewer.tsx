@@ -33,7 +33,7 @@ export function ShareViewer({ token, fileName, kind }: { token: string; fileName
       )}
       {kind === "image" && <img src={rawUrl} alt={fileName} style={{ maxWidth: "100%", borderRadius: 8, border: "1px solid #e4e0da" }} />}
       {kind === "pdf" && <iframe src={rawUrl} style={{ width: "100%", height: 480, border: "1px solid #e4e0da", borderRadius: 8 }} />}
-      {kind === "html" && <iframe src={rawUrl} sandbox="" style={{ width: "100%", height: 640, border: "1px solid #e4e0da", borderRadius: 8, background: "#fff" }} />}
+      {kind === "html" && <iframe src={rawUrl} sandbox="" style={{ width: "100%", height: "80vh", minHeight: 480, border: "1px solid #e4e0da", borderRadius: 8, background: "#fff" }} />}
       {kind === "binary" && <div style={{ fontSize: 13, color: "#57534d" }}>미리보기를 지원하지 않는 형식입니다. 다운로드해주세요.</div>}
     </div>
   );
