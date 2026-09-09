@@ -14,11 +14,13 @@ export default async function FileViewPage({ searchParams }: { searchParams: Pro
 
   let title: string;
   let html: string;
+  let format: string;
 
   if (isKbPath(relPath)) {
     const note = await resolveKbNote(relPath);
     if (!note) notFound();
     title = note.title;
+    format = note.format;
     html = renderNote(note.content, note.format);
   } else {
     const ext = path.extname(relPath).replace(".", "").toUpperCase();
@@ -26,7 +28,8 @@ export default async function FileViewPage({ searchParams }: { searchParams: Pro
     try {
       const buf = await readFileBuffer(relPath);
       title = path.basename(relPath, path.extname(relPath));
-      html = renderNote(buf.toString("utf-8"), ext === "HTML" ? "html" : "md");
+      format = ext === "HTML" ? "html" : "md";
+      html = renderNote(buf.toString("utf-8"), format);
     } catch (e) {
       if (e instanceof UnsafePathError) notFound();
       throw e;
@@ -38,7 +41,7 @@ export default async function FileViewPage({ searchParams }: { searchParams: Pro
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 15px", borderBottom: "1px solid var(--line)" }}>
         <div style={{ fontFamily: "var(--font-mono), monospace", fontSize: 11.5, color: "var(--ink3)" }}>/{relPath.replace(/^__kb__\//, "지식베이스/")}</div>
       </div>
-      <article style={{ padding: "26px 30px", maxWidth: 780 }}>
+      <article style={{ padding: "26px 30px", maxWidth: format === "html" ? "none" : 780, overflowX: "auto" }}>
         <h1 style={{ margin: "0 0 16px", fontSize: 23, fontWeight: 600, letterSpacing: "-.02em" }}>{title}</h1>
         <div className="wiki-content" style={{ color: "var(--ink2)", fontSize: 14, lineHeight: 1.75 }} dangerouslySetInnerHTML={{ __html: html }} />
       </article>

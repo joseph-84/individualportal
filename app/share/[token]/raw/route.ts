@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import path from "node:path";
 import { prisma } from "@/lib/prisma";
 import { readFileBuffer, UnsafePathError } from "@/lib/files";
+import { isKbPath, resolveKbNote } from "@/lib/kb-files";
 import { shareAccessCookieName, verifyShareAccessToken } from "@/lib/share-otp-auth";
 
 const MIME: Record<string, string> = {
@@ -15,6 +16,7 @@ const MIME: Record<string, string> = {
   MD: "text/markdown; charset=utf-8",
   TXT: "text/plain; charset=utf-8",
   CSV: "text/csv; charset=utf-8",
+  HTML: "text/html; charset=utf-8",
 };
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
@@ -33,12 +35,32 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
     }
   }
 
+  const download = req.nextUrl.searchParams.get("download") === "1";
+
+  if (isKbPath(link.relPath)) {
+    const note = await resolveKbNote(link.relPath);
+    if (!note) return new NextResponse("문서를 찾을 수 없습니다.", { status: 404 });
+    prisma.shareLink.update({ where: { id: link.id }, data: { lastAccessedAt: new Date() } }).catch(() => {});
+
+    const filename = `${note.title}.${note.format}`;
+    if (download) {
+      return new NextResponse(note.content, {
+        headers: {
+          "Content-Type": "application/octet-stream",
+          "Content-Disposition": `attachment; filename="${encodeURIComponent(filename)}"`,
+        },
+      });
+    }
+    return new NextResponse(note.content, {
+      headers: { "Content-Type": note.format === "html" ? "text/html; charset=utf-8" : "text/markdown; charset=utf-8" },
+    });
+  }
+
   try {
     const buf = await readFileBuffer(link.relPath);
     prisma.shareLink.update({ where: { id: link.id }, data: { lastAccessedAt: new Date() } }).catch(() => {});
 
     const ext = path.extname(link.relPath).replace(".", "").toUpperCase();
-    const download = req.nextUrl.searchParams.get("download") === "1";
     const filename = path.basename(link.relPath);
 
     if (download) {

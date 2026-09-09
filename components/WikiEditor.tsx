@@ -120,7 +120,7 @@ export function WikiEditor({ noteId, path, title, format, content, html, updated
       </div>
 
       {mode === "view" && (
-        <article style={{ padding: "26px 30px", maxWidth: 740 }}>
+        <article style={{ padding: "26px 30px", maxWidth: format === "html" ? "none" : 740, overflowX: "auto" }}>
           <h1 style={{ margin: "0 0 16px", fontSize: 23, fontWeight: 600, letterSpacing: "-.02em" }}>{title}</h1>
           <div className="wiki-content" style={{ color: "var(--ink2)", fontSize: 14, lineHeight: 1.75 }} dangerouslySetInnerHTML={{ __html: html }} />
         </article>
