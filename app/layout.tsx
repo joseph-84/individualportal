@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import { ThemeProvider } from "@/lib/theme-context";
 import "./globals.css";
@@ -20,6 +20,11 @@ const plexMono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "Portal",
   description: "개인 업무 자동화 포털",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

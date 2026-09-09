@@ -34,7 +34,7 @@ export function CodeEditor({
   };
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "196px minmax(360px,1fr)", gap: 12, alignItems: "start", overflowX: "auto" }}>
+    <div className="editor-grid" style={{ display: "grid", gridTemplateColumns: "196px minmax(360px,1fr)", gap: 12, alignItems: "start", overflowX: "auto" }}>
       <aside style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 10, padding: 10 }}>
         <div style={{ fontFamily: "var(--font-mono), monospace", fontSize: 10, fontWeight: 600, letterSpacing: ".1em", color: "var(--ink3)", padding: "2px 8px 8px" }}>
           SCRIPTS

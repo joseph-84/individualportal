@@ -4,17 +4,20 @@ import { usePathname } from "next/navigation";
 import { TITLES } from "@/lib/constants";
 import { pathToPageKey } from "@/lib/routing";
 import { useTheme } from "@/lib/theme-context";
+import { useMobileNav } from "@/lib/mobile-nav-context";
 import { HeaderSearch } from "./HeaderSearch";
 import { NotificationBell } from "./NotificationBell";
 
 export function Header() {
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
+  const { toggle } = useMobileNav();
   const pageKey = pathToPageKey(pathname);
   const [title, subtitle] = TITLES[pageKey] || ["", ""];
 
   return (
     <header
+      className="app-header"
       style={{
         height: 52,
         flex: "none",
@@ -29,8 +32,17 @@ export function Header() {
         zIndex: 5,
       }}
     >
+      <button
+        onClick={toggle}
+        className="app-hamburger"
+        aria-label="메뉴 열기"
+        style={{ width: 30, height: 30, border: "1px solid var(--line)", borderRadius: 7, background: "var(--panel2)", color: "var(--ink2)", cursor: "pointer", fontSize: 14, flex: "none" }}
+      >
+        ☰
+      </button>
       <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: "-.01em", whiteSpace: "nowrap" }}>{title}</div>
       <div
+        className="app-header-subtitle"
         style={{
           fontSize: 12,
           color: "var(--ink3)",

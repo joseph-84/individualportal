@@ -284,6 +284,7 @@ export function FilesBrowser({
 
   return (
     <div
+      className="fb-grid"
       style={{
         display: "grid",
         gridTemplateColumns: selected ? "220px 250px minmax(0,1fr)" : "220px minmax(0,1fr)",
@@ -292,7 +293,7 @@ export function FilesBrowser({
         overflowX: "auto",
       }}
     >
-      <aside style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 10, padding: 10, position: "sticky", top: 70, maxHeight: "calc(100vh - 90px)", overflowY: "auto" }}>
+      <aside className="fb-tree" style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 10, padding: 10, position: "sticky", top: 70, maxHeight: "calc(100vh - 90px)", overflowY: "auto" }}>
         <div style={{ fontFamily: "var(--font-mono), monospace", fontSize: 10, fontWeight: 600, letterSpacing: ".1em", color: "var(--ink3)", padding: "2px 8px 8px" }}>
           FOLDERS
         </div>
