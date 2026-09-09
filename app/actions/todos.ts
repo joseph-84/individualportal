@@ -3,13 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requirePerm } from "@/lib/guard";
-
-export const TODO_STATUSES = ["todo", "in_progress", "done"] as const;
-export type TodoStatus = (typeof TODO_STATUSES)[number];
-
-function isTodoStatus(v: string): v is TodoStatus {
-  return (TODO_STATUSES as readonly string[]).includes(v);
-}
+import { isTodoStatus } from "@/lib/todo-status";
 
 async function nextOrder(parentId: string | null): Promise<number> {
   const last = await prisma.todo.findFirst({ where: { parentId }, orderBy: { order: "desc" } });
