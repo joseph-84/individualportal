@@ -54,11 +54,17 @@ const SANITIZE_OPTS: sanitizeHtml.IOptions = {
   },
   allowedSchemes: ["http", "https", "mailto"],
   allowedSchemesByTag: { img: ["http", "https", "data"] },
-  allowedStyles: {
-    "*": {
-      "*": [/.*/],
-    },
-  },
+  // Deliberately omit `allowedStyles`: sanitize-html only supports a "*" wildcard for the TAG
+  // key, not the CSS property-name key within a tag's style map — `{"*":{"*":[/.*/]}}` (our
+  // previous attempt at "allow any property") silently matches nothing and strips every inline
+  // `style="..."` attribute. Omitting the option entirely disables property-level filtering and
+  // keeps the whole style attribute, which is what we actually want here.
+  //
+  // The underlying parser also lowercases attribute names by default (fine for regular HTML,
+  // but it silently strips camelCase SVG attributes like viewBox/markerWidth/preserveAspectRatio
+  // since the lowercased name no longer matches the allowlist above) — preserve original case
+  // so SVG diagrams keep their viewBox and scale/clip correctly instead of overflowing.
+  parser: { lowerCaseAttributeNames: false },
 };
 
 export function renderMarkdown(source: string): string {
