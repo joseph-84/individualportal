@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition, useActionState } from "react";
+import { useEffect, useMemo, useState, useTransition, useActionState } from "react";
 import { createTodoAction, deleteTodoAction, editTodoAction, reorderTodoAction, moveTodoAction, type EditTodoState } from "@/app/actions/todos";
 import { TodoCheckbox } from "./TodoCheckbox";
 
@@ -40,6 +40,12 @@ function seg(on: boolean): [string, string] {
 
 const FILTERS = ["전체", "오늘", "이번 주", "반복만"] as const;
 type Filter = (typeof FILTERS)[number];
+
+const VIEW_STORAGE_KEY = "portal-todos-view";
+type TodoView = "list" | "cal" | "kanban";
+function isTodoView(v: string | null): v is TodoView {
+  return v === "list" || v === "cal" || v === "kanban";
+}
 
 function isSameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
@@ -473,7 +479,19 @@ interface GoogleCalendarEvent {
 }
 
 export function TodosClient({ todos, canWrite, googleEvents = [] }: { todos: TodoItem[]; canWrite: boolean; googleEvents?: GoogleCalendarEvent[] }) {
-  const [view, setView] = useState<"list" | "cal" | "kanban">("list");
+  const [view, setViewState] = useState<TodoView>("list");
+  const setView = (v: TodoView) => {
+    setViewState(v);
+    try {
+      window.localStorage.setItem(VIEW_STORAGE_KEY, v);
+    } catch {}
+  };
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(VIEW_STORAGE_KEY);
+      if (isTodoView(stored)) setViewState(stored);
+    } catch {}
+  }, []);
   const [showForm, setShowForm] = useState(false);
   const [filter, setFilter] = useState<Filter>("전체");
   const [editingId, setEditingId] = useState<string | null>(null);
