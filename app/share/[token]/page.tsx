@@ -35,6 +35,11 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
     borderRadius: 12,
     padding: 28,
   };
+  // HTML documents are rendered in their own <iframe> (its own viewport, so its internal
+  // @media queries respond to the iframe's own width, not the browser window's) — a narrow
+  // 460px card squeezed it down into that document's own mobile breakpoint. Give HTML content
+  // a much wider card so it renders at its intended desktop width.
+  const wideCardStyle: React.CSSProperties = { ...cardStyle, maxWidth: 1180 };
 
   if (!link || link.revoked) {
     return (
@@ -56,7 +61,7 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
   if (link.scope === "public") {
     return (
       <div style={shellStyle}>
-        <div style={cardStyle}>
+        <div style={kind === "html" ? wideCardStyle : cardStyle}>
           <ShareViewer token={token} fileName={fileName} kind={kind} />
         </div>
       </div>
@@ -71,7 +76,7 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
   if (verified) {
     return (
       <div style={shellStyle}>
-        <div style={cardStyle}>
+        <div style={kind === "html" ? wideCardStyle : cardStyle}>
           <ShareViewer token={token} fileName={fileName} kind={kind} />
         </div>
       </div>
