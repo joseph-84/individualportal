@@ -47,7 +47,8 @@ export async function listDir(relPath: string): Promise<FileEntry[]> {
 const TEXT_EXT = new Set(["MD", "TXT", "CSV", "LOG", "JSON", "YML", "YAML", "TS", "JS", "PY", "SH"]);
 const IMAGE_EXT = new Set(["PNG", "JPG", "JPEG", "GIF", "WEBP", "SVG"]);
 
-export function previewKind(ext: string): "text" | "image" | "pdf" | "binary" {
+export function previewKind(ext: string): "text" | "image" | "pdf" | "html" | "binary" {
+  if (ext === "HTML") return "html";
   if (TEXT_EXT.has(ext)) return "text";
   if (IMAGE_EXT.has(ext)) return "image";
   if (ext === "PDF") return "pdf";
