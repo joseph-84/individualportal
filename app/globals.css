@@ -167,10 +167,12 @@ select {
 .wiki-content ul[data-type="taskList"] input[type="checkbox"] {
   cursor: pointer;
 }
-/* Read-only renders (list/kanban) share .wiki-content with the live editor, but their
+/* Read-only wiki/file-preview renders share .wiki-content with the live editor, but their
    checkboxes have no handler wired up -- clicking would silently do nothing, so disable
-   interaction there. The editor itself also carries .rich-text-editable, so it's excluded. */
-.wiki-content:not(.rich-text-editable) ul[data-type="taskList"] input[type="checkbox"] {
+   interaction there. Todo descriptions are excluded from this: both the live editor
+   (.rich-text-editable) and the read-only list/Kanban render (.rich-text-content, wired up
+   to toggleDescriptionCheckboxAction) keep their checkboxes clickable. */
+.wiki-content:not(.rich-text-editable):not(.rich-text-content) ul[data-type="taskList"] input[type="checkbox"] {
   pointer-events: none;
   cursor: default;
 }
