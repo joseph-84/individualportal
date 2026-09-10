@@ -83,3 +83,45 @@ export function renderSanitizedHtml(source: string): string {
 export function renderNote(content: string, format: string): string {
   return format === "html" ? renderSanitizedHtml(content) : renderMarkdown(content);
 }
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+/** Wraps rendered note/document HTML in a full standalone page with its own embedded
+ * typography — used for the public share viewer, which loads content into a sandboxed
+ * <iframe> that has no access to the app's own stylesheet. A note authored as raw HTML
+ * (e.g. an AI-generated study guide) usually carries its own more specific <style> block
+ * that overrides these baseline rules; markdown-rendered notes have none of their own, so
+ * they get this document's typography as-is instead of unstyled browser defaults. */
+export function renderShareDocument(title: string, bodyHtml: string): string {
+  return `<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>${escapeHtml(title)}</title>
+<style>
+  body { margin:0; padding:32px 40px; background:#fff; color:#1b1a18; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif; font-size:16px; line-height:1.85; }
+  h1 { font-size:28px; font-weight:600; margin:0 0 18px; }
+  h2 { font-size:21px; font-weight:600; margin:30px 0 12px; }
+  h3 { font-size:17px; font-weight:600; margin:22px 0 8px; }
+  p { margin:0 0 16px; }
+  ul, ol { margin:0 0 16px; padding-left:22px; }
+  li { margin-bottom:6px; }
+  code { font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size:.9em; background:#f0eeea; padding:1px 5px; border-radius:4px; }
+  pre { background:#f0eeea; padding:14px 16px; border-radius:8px; overflow-x:auto; }
+  pre code { background:none; padding:0; }
+  blockquote { margin:0 0 16px; padding:10px 14px; border-left:3px solid #b0512e; background:#fbeade; border-radius:0 8px 8px 0; }
+  table { border-collapse:collapse; margin:0 0 16px; max-width:100%; }
+  th, td { border:1px solid #e4e0da; padding:7px 11px; }
+  img, svg { max-width:100%; height:auto; }
+  a { color:#b0512e; }
+</style>
+</head>
+<body>
+<h1>${escapeHtml(title)}</h1>
+${bodyHtml}
+</body>
+</html>`;
+}
