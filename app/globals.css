@@ -175,6 +175,34 @@ select {
   cursor: default;
 }
 
+/* Todo descriptions (editor + read-only render): the wiki article spacing above is tuned for
+   long-form prose, but a description is usually a handful of short lines/checklist items --
+   the same 12px paragraph margin there reads as a huge gap between lines. Tighten it. */
+.rich-text-content {
+  line-height: 1.5;
+}
+.rich-text-content p {
+  margin: 0 0 4px;
+}
+.rich-text-content ul,
+.rich-text-content ol {
+  margin: 0 0 4px;
+}
+.rich-text-content li {
+  margin-bottom: 1px;
+}
+.rich-text-content ul[data-type="taskList"] {
+  margin: 0 0 4px;
+}
+.rich-text-content ul[data-type="taskList"] li {
+  margin-bottom: 1px;
+}
+.rich-text-content p:last-child,
+.rich-text-content ul:last-child,
+.rich-text-content ol:last-child {
+  margin-bottom: 0;
+}
+
 .rich-text-editable {
   outline: none;
   min-height: 60px;

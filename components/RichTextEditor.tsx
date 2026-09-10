@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useRef } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import TaskList from "@tiptap/extension-task-list";
@@ -20,9 +20,15 @@ const BTN_STYLE = (active: boolean): React.CSSProperties => ({
 
 /** A compact Notion/Confluence-style rich text editor for todo descriptions (bold/italic,
  * bullet/numbered lists, task checkboxes). Submits its HTML via a hidden input so it works
- * with the existing plain `<form action={...}>` server-action pattern. */
+ * with the existing plain `<form action={...}>` server-action pattern.
+ *
+ * The hidden input is uncontrolled (imperatively updated via a ref inside onUpdate) rather
+ * than React-state-controlled -- checking a task-item checkbox dispatches its transaction
+ * from a raw DOM listener the NodeView adds itself (outside JSX/React's synthetic event
+ * path), and going through this ref avoids depending on a state+re-render round trip to
+ * land before the surrounding form submits. */
 export function RichTextEditor({ name, defaultValue }: { name: string; defaultValue?: string }) {
-  const [html, setHtml] = useState(defaultValue || "");
+  const hiddenInputRef = useRef<HTMLInputElement>(null);
 
   const editor = useEditor({
     extensions: [
@@ -33,14 +39,12 @@ export function RichTextEditor({ name, defaultValue }: { name: string; defaultVa
     content: defaultValue || "",
     immediatelyRender: false,
     editorProps: {
-      attributes: { class: "wiki-content rich-text-editable" },
+      attributes: { class: "wiki-content rich-text-content rich-text-editable" },
     },
-    onUpdate: ({ editor }) => setHtml(editor.getHTML()),
+    onUpdate: ({ editor }) => {
+      if (hiddenInputRef.current) hiddenInputRef.current.value = editor.getHTML();
+    },
   });
-
-  useEffect(() => {
-    return () => editor?.destroy();
-  }, [editor]);
 
   if (!editor) {
     return <div style={{ height: 96, border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel)" }} />;
@@ -66,7 +70,7 @@ export function RichTextEditor({ name, defaultValue }: { name: string; defaultVa
         </button>
       </div>
       <EditorContent editor={editor} style={{ padding: "8px 10px", minHeight: 80, maxHeight: 260, overflowY: "auto", fontSize: 12.5 }} />
-      <input type="hidden" name={name} value={html} />
+      <input ref={hiddenInputRef} type="hidden" name={name} defaultValue={defaultValue || ""} />
     </div>
   );
 }
