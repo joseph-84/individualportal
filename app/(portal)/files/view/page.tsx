@@ -43,7 +43,7 @@ export default async function FileViewPage({ searchParams }: { searchParams: Pro
       </div>
       <article style={{ padding: "26px 30px", maxWidth: format === "html" ? "none" : 780, overflowX: "auto" }}>
         <h1 style={{ margin: "0 0 16px", fontSize: 23, fontWeight: 600, letterSpacing: "-.02em" }}>{title}</h1>
-        <div className="wiki-content" style={{ color: "var(--ink2)", fontSize: 14, lineHeight: 1.75 }} dangerouslySetInnerHTML={{ __html: html }} />
+        <div className="wiki-content doc-viewer" style={{ color: "var(--ink2)" }} dangerouslySetInnerHTML={{ __html: html }} />
       </article>
     </section>
   );

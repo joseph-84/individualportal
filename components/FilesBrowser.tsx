@@ -530,7 +530,7 @@ export function FilesBrowser({
           {!preview && <div style={{ padding: 24, fontSize: 12.5, color: "var(--ink3)" }}>불러오는 중...</div>}
           {preview?.kind === "doc" && (
             <article style={{ padding: "26px 30px", height: "calc(100vh - 220px)", minHeight: 320, overflow: "auto" }}>
-              <div className="wiki-content" style={{ color: "var(--ink2)", fontSize: 14, lineHeight: 1.75 }} dangerouslySetInnerHTML={{ __html: preview.html || "" }} />
+              <div className="wiki-content doc-viewer" style={{ color: "var(--ink2)" }} dangerouslySetInnerHTML={{ __html: preview.html || "" }} />
             </article>
           )}
           {preview?.kind === "text" && (

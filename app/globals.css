@@ -144,6 +144,36 @@ select {
   max-width: 100%;
   height: auto;
 }
+
+/* Large reading contexts (file browser preview, "새 창에서 보기") -- .wiki-content's base
+   type scale was tuned for the wiki page's narrower sidebar-editor panel, so markdown notes
+   without their own styling (unlike AI-generated HTML docs, which usually set their own
+   larger font sizes) rendered noticeably small and plain in a big preview pane. */
+.doc-viewer {
+  font-size: 15.5px;
+  line-height: 1.85;
+}
+.doc-viewer.wiki-content h1 {
+  font-size: 28px;
+  margin: 28px 0 14px;
+}
+.doc-viewer.wiki-content h2 {
+  font-size: 21px;
+  margin: 26px 0 12px;
+}
+.doc-viewer.wiki-content h3 {
+  font-size: 17px;
+  margin: 20px 0 8px;
+}
+.doc-viewer.wiki-content p {
+  margin: 0 0 16px;
+}
+.doc-viewer.wiki-content li {
+  margin-bottom: 6px;
+}
+.doc-viewer.wiki-content table {
+  font-size: 1em;
+}
 .wiki-content ul[data-type="taskList"] {
   list-style: none;
   padding-left: 0;
