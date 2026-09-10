@@ -211,7 +211,7 @@ function TodoRow({
           <div style={{ fontSize: 13, color: done ? "var(--ink3)" : "var(--ink)", textDecoration: done ? "line-through" : "none" }}>{todo.title}</div>
           {todo.descriptionHtml && (
             <div
-              className="wiki-content"
+              className="wiki-content rich-text-content"
               style={{ fontSize: 11.5, color: "var(--ink3)", marginTop: 2 }}
               dangerouslySetInnerHTML={{ __html: todo.descriptionHtml }}
             />
@@ -412,7 +412,7 @@ function KanbanCard({
       </div>
       {todo.descriptionHtml && (
         <div
-          className="wiki-content"
+          className="wiki-content rich-text-content"
           style={{
             fontSize: 11,
             color: "var(--ink3)",
