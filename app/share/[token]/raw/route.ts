@@ -3,7 +3,7 @@ import path from "node:path";
 import { prisma } from "@/lib/prisma";
 import { readFileBuffer, UnsafePathError } from "@/lib/files";
 import { isKbPath, resolveKbNote } from "@/lib/kb-files";
-import { renderNote } from "@/lib/markdown";
+import { renderNote, renderShareDocument } from "@/lib/markdown";
 import { shareAccessCookieName, verifyShareAccessToken } from "@/lib/share-otp-auth";
 
 const MIME: Record<string, string> = {
@@ -52,13 +52,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
         },
       });
     }
-    // Inline (non-download) HTML is shown to external, non-owner viewers, so it's sanitized
-    // first — unlike the internal wiki viewer/file browser, which trust the single account
-    // that authors and reads every note. Downloading still returns the true original file.
-    if (note.format === "html") {
-      return new NextResponse(renderNote(note.content, "html"), { headers: { "Content-Type": "text/html; charset=utf-8" } });
-    }
-    return new NextResponse(note.content, { headers: { "Content-Type": "text/markdown; charset=utf-8" } });
+    // Inline (non-download) rendering is shown to external, non-owner viewers, so it's
+    // sanitized first — unlike the internal wiki viewer/file browser, which trust the single
+    // account that authors and reads every note. Downloading still returns the true original
+    // file. Both formats render to a full standalone document (see renderShareDocument) since
+    // this is loaded into a sandboxed <iframe> with no access to the app's own stylesheet.
+    const body = renderNote(note.content, note.format);
+    return new NextResponse(renderShareDocument(note.title, body), { headers: { "Content-Type": "text/html; charset=utf-8" } });
   }
 
   try {
@@ -76,10 +76,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
         },
       });
     }
-    // Sanitize inline HTML for the same reason as the KB branch above — this is shown to
-    // external, non-owner viewers.
-    if (ext === "HTML") {
-      return new NextResponse(renderNote(buf.toString("utf-8"), "html"), { headers: { "Content-Type": "text/html; charset=utf-8" } });
+    // Render + sanitize inline HTML/markdown for the same reason as the KB branch above —
+    // this is shown to external, non-owner viewers.
+    if (ext === "HTML" || ext === "MD") {
+      const body = renderNote(buf.toString("utf-8"), ext === "HTML" ? "html" : "md");
+      const title = path.basename(link.relPath, path.extname(link.relPath));
+      return new NextResponse(renderShareDocument(title, body), { headers: { "Content-Type": "text/html; charset=utf-8" } });
     }
     return new NextResponse(new Uint8Array(buf), {
       headers: { "Content-Type": MIME[ext] || "application/octet-stream" },
