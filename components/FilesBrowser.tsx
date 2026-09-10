@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { ShareDialog } from "./ShareDialog";
+import { MoveCopyDialog } from "./MoveCopyDialog";
 
 interface FileEntry {
   name: string;
@@ -58,6 +59,7 @@ function FolderTreeNode({
   onToggle,
   onSelect,
   onDeleteFolder,
+  onMoveCopyFolder,
 }: {
   path: string;
   name: string;
@@ -69,6 +71,7 @@ function FolderTreeNode({
   onToggle: (path: string) => void;
   onSelect: (path: string) => void;
   onDeleteFolder: (path: string) => void;
+  onMoveCopyFolder: (path: string) => void;
 }) {
   const kids = (dirCache[path] || []).filter((e) => e.isDir);
   const isExpanded = expanded.has(path);
@@ -106,13 +109,22 @@ function FolderTreeNode({
           <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
         </button>
         {canWrite && !isKb(path) && (
-          <button
-            onClick={() => onDeleteFolder(path)}
-            title="폴더 삭제"
-            style={{ flex: "none", width: 18, height: 20, border: 0, background: "transparent", color: "var(--ink3)", cursor: "pointer", fontSize: 11 }}
-          >
-            ✕
-          </button>
+          <>
+            <button
+              onClick={() => onMoveCopyFolder(path)}
+              title="폴더 이동/복사"
+              style={{ flex: "none", width: 18, height: 20, border: 0, background: "transparent", color: "var(--ink3)", cursor: "pointer", fontSize: 10.5 }}
+            >
+              ⇄
+            </button>
+            <button
+              onClick={() => onDeleteFolder(path)}
+              title="폴더 삭제"
+              style={{ flex: "none", width: 18, height: 20, border: 0, background: "transparent", color: "var(--ink3)", cursor: "pointer", fontSize: 11 }}
+            >
+              ✕
+            </button>
+          </>
         )}
       </div>
       {isExpanded &&
@@ -129,6 +141,7 @@ function FolderTreeNode({
             onToggle={onToggle}
             onSelect={onSelect}
             onDeleteFolder={onDeleteFolder}
+            onMoveCopyFolder={onMoveCopyFolder}
           />
         ))}
     </div>
@@ -153,7 +166,9 @@ export function FilesBrowser({
   const [selected, setSelected] = useState<FileEntry | null>(null);
   const [preview, setPreview] = useState<{ kind: string; text?: string; html?: string } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [dragOverUpload, setDragOverUpload] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [movingCopying, setMovingCopying] = useState<{ relPath: string; isDir: boolean } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const inKb = isKb(dir);
@@ -226,10 +241,12 @@ export function FilesBrowser({
 
   const upload = async (fileList: FileList | null) => {
     if (!fileList || fileList.length === 0) return;
-    const fd = new FormData();
-    fd.set("dir", dir);
-    fd.set("file", fileList[0]);
-    await fetch("/api/files/upload", { method: "POST", body: fd });
+    for (const file of Array.from(fileList)) {
+      const fd = new FormData();
+      fd.set("dir", dir);
+      fd.set("file", file);
+      await fetch("/api/files/upload", { method: "POST", body: fd });
+    }
     ensureLoaded(dir, true);
   };
 
@@ -280,6 +297,21 @@ export function FilesBrowser({
     }
   };
 
+  const afterMoveCopy = (destDir: string) => {
+    if (!movingCopying) return;
+    const { relPath, isDir } = movingCopying;
+    const parent = relPath.includes("/") ? relPath.slice(0, relPath.lastIndexOf("/")) : "";
+    ensureLoaded(parent, true);
+    if (destDir !== parent) ensureLoaded(destDir, true);
+    if (selected?.relPath === relPath) {
+      setSelected(null);
+      setPreview(null);
+    }
+    if (isDir && (dir === relPath || dir.startsWith(relPath + "/"))) {
+      loadDir(parent);
+    }
+  };
+
   const contentUrl = selected ? `/api/files/content?path=${encodeURIComponent(selected.relPath)}` : "";
 
   return (
@@ -319,6 +351,7 @@ export function FilesBrowser({
             onToggle={toggleExpand}
             onSelect={loadDir}
             onDeleteFolder={(p) => deletePath(p, true)}
+            onMoveCopyFolder={(p) => setMovingCopying({ relPath: p, isDir: true })}
           />
         ))}
         <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--line2)", fontSize: 11.5, color: "var(--ink3)" }}>
@@ -329,7 +362,49 @@ export function FilesBrowser({
         </div>
       </aside>
 
-      <section style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 10, overflow: "hidden" }}>
+      <section
+        onDragOver={(e) => {
+          if (!writable) return;
+          e.preventDefault();
+          setDragOverUpload(true);
+        }}
+        onDragLeave={(e) => {
+          if (!writable) return;
+          if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+          setDragOverUpload(false);
+        }}
+        onDrop={(e) => {
+          if (!writable) return;
+          e.preventDefault();
+          setDragOverUpload(false);
+          upload(e.dataTransfer.files);
+        }}
+        style={{
+          background: "var(--panel)",
+          border: dragOverUpload ? "2px dashed var(--accent)" : "1px solid var(--line)",
+          borderRadius: 10,
+          overflow: "hidden",
+          position: "relative",
+        }}
+      >
+        {dragOverUpload && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              zIndex: 10,
+              background: "var(--accent-soft)",
+              display: "grid",
+              placeItems: "center",
+              fontSize: 13,
+              fontWeight: 600,
+              color: "var(--accent)",
+              pointerEvents: "none",
+            }}
+          >
+            여기에 파일을 놓아 업로드
+          </div>
+        )}
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderBottom: "1px solid var(--line)" }}>
           <div style={{ fontFamily: "var(--font-mono), monospace", fontSize: 11.5, color: "var(--ink3)", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {inKb ? "지식베이스" : `/${dir}`}
@@ -337,7 +412,7 @@ export function FilesBrowser({
         </div>
         {writable && (
           <div style={{ display: "flex", gap: 6, padding: "8px 14px", borderBottom: "1px solid var(--line)" }}>
-            <input ref={fileInput} type="file" hidden onChange={(e) => upload(e.target.files)} />
+            <input ref={fileInput} type="file" multiple hidden onChange={(e) => upload(e.target.files)} />
             <button
               onClick={() => fileInput.current?.click()}
               style={{ height: 26, padding: "0 10px", border: 0, borderRadius: 6, background: "var(--accent)", color: "var(--on-accent)", fontSize: 11.5, fontWeight: 600, cursor: "pointer" }}
@@ -427,6 +502,12 @@ export function FilesBrowser({
                   이름변경
                 </button>
                 <button
+                  onClick={() => setMovingCopying({ relPath: selected.relPath, isDir: false })}
+                  style={{ height: 27, padding: "0 10px", border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel2)", color: "var(--ink2)", fontSize: 11.5, cursor: "pointer" }}
+                >
+                  이동/복사
+                </button>
+                <button
                   onClick={() => deletePath(selected.relPath, false)}
                   style={{ height: 27, padding: "0 10px", border: "1px solid var(--err)", borderRadius: 6, background: "var(--err-soft)", color: "var(--err)", fontSize: 11.5, cursor: "pointer" }}
                 >
@@ -499,6 +580,9 @@ export function FilesBrowser({
         </section>
       )}
       {sharing && selected && <ShareDialog relPath={selected.relPath} onClose={() => setSharing(false)} />}
+      {movingCopying && (
+        <MoveCopyDialog relPath={movingCopying.relPath} isDir={movingCopying.isDir} onClose={() => setMovingCopying(null)} onDone={afterMoveCopy} />
+      )}
     </div>
   );
 }

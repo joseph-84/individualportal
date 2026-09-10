@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { apiRequirePerm } from "@/lib/guard";
-import { listDir, ensureDir, deleteEntry, renameOrMoveEntry, UnsafePathError } from "@/lib/files";
+import { listDir, ensureDir, deleteEntry, renameOrMoveEntry, copyEntry, UnsafePathError } from "@/lib/files";
 import { isKbPath, listKbEntries, kbRootEntry } from "@/lib/kb-files";
 import { writeAudit } from "@/lib/audit";
 
@@ -31,7 +31,9 @@ export async function POST(req: NextRequest) {
   if (!body || typeof body.action !== "string") {
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
-  if ((typeof body.dir === "string" && isKbPath(body.dir)) || (typeof body.path === "string" && isKbPath(body.path))) {
+  if (
+    [body.dir, body.path, body.from, body.to].some((p) => typeof p === "string" && isKbPath(p))
+  ) {
     return NextResponse.json({ error: `지식베이스 문서는 위키에서 관리하세요 (읽기 전용).` }, { status: 400 });
   }
 
@@ -50,9 +52,17 @@ export async function POST(req: NextRequest) {
       await writeAudit(auth.user, "file.rename", body.from, { to: body.to });
       return NextResponse.json({ ok: true });
     }
+    if (body.action === "copy" && typeof body.from === "string" && typeof body.to === "string") {
+      await copyEntry(body.from, body.to);
+      await writeAudit(auth.user, "file.copy", body.from, { to: body.to });
+      return NextResponse.json({ ok: true });
+    }
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   } catch (e) {
     if (e instanceof UnsafePathError) return NextResponse.json({ error: e.message }, { status: 400 });
+    if (e && typeof e === "object" && "code" in e && (e.code === "EEXIST" || e.code === "ERR_FS_CP_EEXIST")) {
+      return NextResponse.json({ error: "같은 이름의 파일/폴더가 이미 대상 위치에 있습니다." }, { status: 409 });
+    }
     return NextResponse.json({ error: "작업을 완료할 수 없습니다." }, { status: 500 });
   }
 }

@@ -143,6 +143,7 @@ function TodoRow({
   onDrop: (targetId: string, pos: "before" | "after") => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
+  const [dragArmed, setDragArmed] = useState(false);
   const [, startTransition] = useTransition();
   const [tagBg, tagFg] = CHIP[todo.tag] || CHIP.개인;
   const done = todo.status === "done";
@@ -157,12 +158,13 @@ function TodoRow({
   return (
     <div style={{ borderBottom: depth === 0 ? "1px solid var(--line2)" : "none" }}>
       <div
-        draggable={canWrite}
+        draggable={canWrite && dragArmed}
         onDragStart={(e) => {
           e.dataTransfer.effectAllowed = "move";
           setDragged({ id: todo.id, parentId: todo.parentId ?? null });
         }}
         onDragEnd={() => {
+          setDragArmed(false);
           setDragged(null);
           setDropTarget(null);
         }}
@@ -187,11 +189,15 @@ function TodoRow({
           borderTop: showTopLine ? "2px solid var(--accent)" : "2px solid transparent",
           borderBottom: showBottomLine ? "2px solid var(--accent)" : undefined,
           opacity: dragged?.id === todo.id ? 0.4 : 1,
-          cursor: canWrite ? "grab" : "default",
         }}
       >
         {canWrite && (
-          <span style={{ width: 10, flex: "none", color: "var(--ink3)", fontSize: 11, marginTop: 2, cursor: "grab" }} title="드래그해서 순서 변경">
+          <span
+            onMouseDown={() => setDragArmed(true)}
+            onMouseUp={() => setDragArmed(false)}
+            style={{ width: 10, flex: "none", color: "var(--ink3)", fontSize: 11, marginTop: 2, cursor: "grab", userSelect: "none" }}
+            title="드래그해서 순서 변경"
+          >
             ⠿
           </span>
         )}
@@ -328,6 +334,7 @@ function KanbanCard({
   onDropOnCard: (targetId: string, status: string, pos: "before" | "after") => void;
 }) {
   const [, startTransition] = useTransition();
+  const [dragArmed, setDragArmed] = useState(false);
   const [tagBg, tagFg] = CHIP[todo.tag] || CHIP.개인;
   const canAcceptDrop = canWrite && dragged && dragged.id !== todo.id;
   const isTop = canAcceptDrop && dropTarget?.id === todo.id && dropTarget.pos === "before";
@@ -339,12 +346,13 @@ function KanbanCard({
 
   return (
     <div
-      draggable={canWrite}
+      draggable={canWrite && dragArmed}
       onDragStart={(e) => {
         e.dataTransfer.effectAllowed = "move";
         setDragged({ id: todo.id, status: todo.status });
       }}
       onDragEnd={() => {
+        setDragArmed(false);
         setDragged(null);
         setDropTarget(null);
       }}
@@ -367,12 +375,21 @@ function KanbanCard({
         borderRadius: 8,
         padding: "9px 10px",
         marginBottom: 6,
-        cursor: canWrite ? "grab" : "default",
         opacity: dragged?.id === todo.id ? 0.4 : 1,
         boxShadow: isTop ? "0 -3px 0 var(--accent)" : isBottom ? "0 3px 0 var(--accent)" : "none",
       }}
     >
       <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
+        {canWrite && (
+          <span
+            onMouseDown={() => setDragArmed(true)}
+            onMouseUp={() => setDragArmed(false)}
+            style={{ flex: "none", color: "var(--ink3)", fontSize: 11, marginTop: 1, cursor: "grab", userSelect: "none" }}
+            title="드래그해서 이동"
+          >
+            ⠿
+          </span>
+        )}
         <div style={{ fontSize: 12.5, flex: 1, minWidth: 0, color: todo.status === "done" ? "var(--ink3)" : "var(--ink)", textDecoration: todo.status === "done" ? "line-through" : "none" }}>
           {todo.title}
         </div>
@@ -510,6 +527,8 @@ export function TodosClient({ todos, canWrite, googleEvents = [] }: { todos: Tod
   }, []);
   const [showForm, setShowForm] = useState(false);
   const [filter, setFilter] = useState<Filter>("전체");
+  const [projectFilter, setProjectFilter] = useState<string | null>(null);
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [addingParentId, setAddingParentId] = useState<string | null>(null);
   const [dragged, setDragged] = useState<DragState | null>(null);
@@ -552,12 +571,29 @@ export function TodosClient({ todos, canWrite, googleEvents = [] }: { todos: Tod
     setDropTarget(null);
   };
 
+  const projects = useMemo(() => Array.from(new Set(todos.map((t) => t.project).filter((p): p is string => !!p))).sort(), [todos]);
+
+  const matchesFilters = (t: TodoItem): boolean => {
+    if (projectFilter && t.project !== projectFilter) return false;
+    if (tagFilter && t.tag !== tagFilter) return false;
+    if (filter === "전체") return true;
+    if (filter === "반복만") return !!t.repeat;
+    if (!t.dueAt) return false;
+    const d = new Date(t.dueAt);
+    const now = new Date();
+    if (filter === "오늘") return isSameDay(d, now);
+    const weekEnd = new Date(now);
+    weekEnd.setDate(now.getDate() + (7 - now.getDay()));
+    return d >= new Date(now.getFullYear(), now.getMonth(), now.getDate()) && d <= weekEnd;
+  };
+
   const kanbanColumns = useMemo(() => {
-    const roots = byParent.get("__root__") || [];
+    const roots = (byParent.get("__root__") || []).filter(matchesFilters);
     const cols: Record<string, TodoItem[]> = { todo: [], in_progress: [], done: [] };
     for (const t of roots) (cols[t.status] || cols.todo).push(t);
     return cols;
-  }, [byParent]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [byParent, filter, projectFilter, tagFilter]);
 
   const moveKanbanCard = (status: string, targetId: string | null, pos: "before" | "after") => {
     if (!kanbanDragged) return;
@@ -587,20 +623,9 @@ export function TodosClient({ todos, canWrite, googleEvents = [] }: { todos: Tod
   };
 
   const filteredRoots = useMemo(() => {
-    const roots = byParent.get("__root__") || [];
-    if (filter === "전체") return roots;
-    if (filter === "반복만") return roots.filter((t) => !!t.repeat);
-    const now = new Date();
-    const weekEnd = new Date(now);
-    weekEnd.setDate(now.getDate() + (7 - now.getDay()));
-    return roots.filter((t) => {
-      if (!t.dueAt) return false;
-      const d = new Date(t.dueAt);
-      if (filter === "오늘") return isSameDay(d, now);
-      if (filter === "이번 주") return d >= new Date(now.getFullYear(), now.getMonth(), now.getDate()) && d <= weekEnd;
-      return true;
-    });
-  }, [byParent, filter]);
+    return (byParent.get("__root__") || []).filter(matchesFilters);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [byParent, filter, projectFilter, tagFilter]);
 
   const now = new Date();
   const year = now.getFullYear();
@@ -650,7 +675,7 @@ export function TodosClient({ todos, canWrite, googleEvents = [] }: { todos: Tod
             캘린더
           </button>
         </div>
-        <div style={{ display: "flex", gap: 6 }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {FILTERS.map((f) => {
             const on = filter === f;
             return (
@@ -664,6 +689,34 @@ export function TodosClient({ todos, canWrite, googleEvents = [] }: { todos: Tod
             );
           })}
         </div>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {Object.keys(CHIP).map((t) => {
+            const on = tagFilter === t;
+            return (
+              <button
+                key={t}
+                onClick={() => setTagFilter(on ? null : t)}
+                style={{ padding: "5px 11px", border: `1px solid ${on ? "var(--accent)" : "var(--line)"}`, borderRadius: 999, background: on ? "var(--accent-soft)" : "var(--panel)", color: on ? "var(--accent)" : "var(--ink2)", fontSize: 12, cursor: "pointer", whiteSpace: "nowrap" }}
+              >
+                {t}
+              </button>
+            );
+          })}
+        </div>
+        {projects.length > 0 && (
+          <select
+            value={projectFilter ?? ""}
+            onChange={(e) => setProjectFilter(e.target.value || null)}
+            style={{ height: 28, border: "1px solid var(--line)", borderRadius: 999, background: "var(--panel)", color: "var(--ink2)", fontSize: 12, padding: "0 10px" }}
+          >
+            <option value="">전체 프로젝트</option>
+            {projects.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+        )}
         {canWrite && (
           <button
             onClick={() => setShowForm((v) => !v)}

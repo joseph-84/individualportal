@@ -104,6 +104,16 @@ export async function renameOrMoveEntry(fromRelPath: string, toRelPath: string):
   await fs.rename(fromFull, toFull);
 }
 
+/** Copies a file or directory (recursively) to a new location, leaving the original in place. */
+export async function copyEntry(fromRelPath: string, toRelPath: string): Promise<void> {
+  const fromFull = resolveSafePath(fromRelPath);
+  const toFull = resolveSafePath(toRelPath);
+  await fs.mkdir(path.dirname(toFull), { recursive: true });
+  // errorOnExist only takes effect when force is also false -- otherwise fs.cp defaults to
+  // silently overwriting the destination.
+  await fs.cp(fromFull, toFull, { recursive: true, force: false, errorOnExist: true });
+}
+
 export async function diskUsage(): Promise<{ used: number }> {
   let used = 0;
   async function walk(rel: string, depth: number) {

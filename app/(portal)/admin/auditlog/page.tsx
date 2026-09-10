@@ -18,6 +18,7 @@ const ACTION_LABEL: Record<string, string> = {
   "note.delete": "노트 삭제",
   "file.delete": "파일 삭제",
   "file.rename": "파일 이름변경/이동",
+  "file.copy": "파일 복사",
 };
 
 export default async function AuditLogPage() {
