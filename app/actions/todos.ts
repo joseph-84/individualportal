@@ -4,6 +4,12 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requirePerm } from "@/lib/guard";
 import { isTodoStatus } from "@/lib/todo-status";
+import { isEmptyRichText } from "@/lib/rich-text";
+
+function descriptionField(formData: FormData): string | null {
+  const raw = String(formData.get("description") || "");
+  return isEmptyRichText(raw) ? null : raw;
+}
 
 async function nextOrder(parentId: string | null): Promise<number> {
   const last = await prisma.todo.findFirst({ where: { parentId }, orderBy: { order: "desc" } });
@@ -31,7 +37,7 @@ export async function createTodoAction(formData: FormData) {
   await prisma.todo.create({
     data: {
       title,
-      description: String(formData.get("description") || "") || null,
+      description: descriptionField(formData),
       project: String(formData.get("project") || "") || null,
       tag: String(formData.get("tag") || "업무"),
       repeat: String(formData.get("repeat") || "") || null,
@@ -62,7 +68,7 @@ export async function editTodoAction(_prev: EditTodoState, formData: FormData): 
     where: { id },
     data: {
       title,
-      description: String(formData.get("description") || "") || null,
+      description: descriptionField(formData),
       project: String(formData.get("project") || "") || null,
       tag: String(formData.get("tag") || "업무"),
       repeat: String(formData.get("repeat") || "") || null,

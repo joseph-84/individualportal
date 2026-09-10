@@ -46,7 +46,7 @@ export function buildMcpServer(user: CurrentUser): McpServer {
       description: "새 할일을 생성합니다. parentId를 주면 하위 할일이 됩니다.",
       inputSchema: {
         title: z.string(),
-        description: z.string().optional(),
+        description: z.string().optional().describe("일반 텍스트 또는 HTML(굵게/목록/체크박스 등, 웹 UI의 리치 텍스트 에디터와 동일한 형식)"),
         project: z.string().optional(),
         tag: z.enum(["업무", "반복", "개인", "마감"]).optional(),
         repeat: z.string().optional(),
@@ -84,7 +84,7 @@ export function buildMcpServer(user: CurrentUser): McpServer {
       inputSchema: {
         id: z.string(),
         title: z.string().optional(),
-        description: z.string().optional(),
+        description: z.string().optional().describe("일반 텍스트 또는 HTML(굵게/목록/체크박스 등, 웹 UI의 리치 텍스트 에디터와 동일한 형식)"),
         project: z.string().optional(),
         tag: z.enum(["업무", "반복", "개인", "마감"]).optional(),
         repeat: z.string().optional(),

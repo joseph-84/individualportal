@@ -1,6 +1,7 @@
 import { pageAccess } from "@/lib/guard";
 import { prisma } from "@/lib/prisma";
 import { listGoogleEvents } from "@/lib/google-calendar";
+import { renderSanitizedHtml } from "@/lib/markdown";
 import { TodosClient } from "@/components/TodosClient";
 
 export default async function TodosPage() {
@@ -23,6 +24,7 @@ export default async function TodosPage() {
         id: t.id,
         title: t.title,
         description: t.description,
+        descriptionHtml: t.description ? renderSanitizedHtml(t.description) : null,
         project: t.project,
         repeat: t.repeat,
         tag: t.tag || "개인",
