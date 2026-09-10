@@ -41,6 +41,8 @@ const SANITIZE_OPTS: sanitizeHtml.IOptions = {
     "details",
     "summary",
     "mark",
+    "input", // Tiptap task-list checkboxes (todo descriptions)
+    "label",
     ...SVG_TAGS,
   ]),
   // Acknowledges sanitize-html's warning about allowing <style> (CSS-only risk, no script
@@ -51,6 +53,7 @@ const SANITIZE_OPTS: sanitizeHtml.IOptions = {
     "*": ["style", "class", "id", "title", "align", "valign", "colspan", "rowspan", "width", "height", "data-*", ...SVG_ATTRS],
     a: ["href", "name", "target", "rel"],
     img: ["src", "alt", "width", "height"],
+    input: ["type", "checked", "disabled"],
   },
   allowedSchemes: ["http", "https", "mailto"],
   allowedSchemesByTag: { img: ["http", "https", "data"] },

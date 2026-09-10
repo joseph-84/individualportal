@@ -144,6 +144,41 @@ select {
   max-width: 100%;
   height: auto;
 }
+.wiki-content ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+  margin: 0 0 12px;
+}
+.wiki-content ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 4px;
+}
+.wiki-content ul[data-type="taskList"] li > label {
+  flex: none;
+  margin-right: 7px;
+  margin-top: 2px;
+  user-select: none;
+}
+.wiki-content ul[data-type="taskList"] li > div {
+  flex: 1;
+  min-width: 0;
+}
+.wiki-content ul[data-type="taskList"] input[type="checkbox"] {
+  cursor: pointer;
+}
+/* Read-only renders (list/kanban) share .wiki-content with the live editor, but their
+   checkboxes have no handler wired up -- clicking would silently do nothing, so disable
+   interaction there. The editor itself also carries .rich-text-editable, so it's excluded. */
+.wiki-content:not(.rich-text-editable) ul[data-type="taskList"] input[type="checkbox"] {
+  pointer-events: none;
+  cursor: default;
+}
+
+.rich-text-editable {
+  outline: none;
+  min-height: 60px;
+}
 
 @keyframes pulse {
   0%,

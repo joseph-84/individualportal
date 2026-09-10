@@ -3,11 +3,13 @@
 import { useEffect, useMemo, useState, useTransition, useActionState } from "react";
 import { createTodoAction, deleteTodoAction, editTodoAction, reorderTodoAction, moveTodoAction, type EditTodoState } from "@/app/actions/todos";
 import { TodoCheckbox } from "./TodoCheckbox";
+import { RichTextEditor } from "./RichTextEditor";
 
 interface TodoItem {
   id: string;
   title: string;
   description: string | null;
+  descriptionHtml: string | null;
   project: string | null;
   repeat: string | null;
   tag: string;
@@ -76,13 +78,7 @@ function EditTodoForm({ todo, onDone }: { todo: TodoItem; onDone: () => void }) 
     <form action={formAction} style={{ display: "grid", gap: 8, padding: 12, background: "var(--panel2)", border: "1px solid var(--line)", borderRadius: 8, marginTop: 4, marginBottom: 4 }}>
       <input type="hidden" name="id" value={todo.id} />
       <input name="title" defaultValue={todo.title} required placeholder="제목" style={{ height: 30, padding: "0 9px", border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel)", color: "var(--ink)", fontSize: 12.5 }} />
-      <textarea
-        name="description"
-        defaultValue={todo.description || ""}
-        placeholder="설명"
-        rows={3}
-        style={{ padding: 9, border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel)", color: "var(--ink)", fontSize: 12.5, resize: "vertical", fontFamily: "inherit" }}
-      />
+      <RichTextEditor name="description" defaultValue={todo.description || ""} />
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <input name="project" defaultValue={todo.project || ""} placeholder="프로젝트" style={{ width: 120, height: 30, padding: "0 9px", border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel)", color: "var(--ink)", fontSize: 12.5 }} />
         <input name="dueAt" type="date" defaultValue={todo.dueAt ? todo.dueAt.slice(0, 10) : ""} style={{ height: 30, padding: "0 9px", border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel)", color: "var(--ink)", fontSize: 12.5 }} />
@@ -213,7 +209,13 @@ function TodoRow({
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, color: done ? "var(--ink3)" : "var(--ink)", textDecoration: done ? "line-through" : "none" }}>{todo.title}</div>
-          {todo.description && <div style={{ fontSize: 11.5, color: "var(--ink3)", marginTop: 2, whiteSpace: "pre-wrap" }}>{todo.description}</div>}
+          {todo.descriptionHtml && (
+            <div
+              className="wiki-content"
+              style={{ fontSize: 11.5, color: "var(--ink3)", marginTop: 2 }}
+              dangerouslySetInnerHTML={{ __html: todo.descriptionHtml }}
+            />
+          )}
           <div style={{ display: "flex", gap: 8, marginTop: 3, fontSize: 11, color: "var(--ink3)", fontFamily: "var(--font-mono), monospace" }}>
             {todo.project && <span>{todo.project}</span>}
             {todo.dueAt && <span>{new Date(todo.dueAt).toLocaleDateString("ko-KR", { month: "2-digit", day: "2-digit" })}</span>}
@@ -408,21 +410,20 @@ function KanbanCard({
           </div>
         )}
       </div>
-      {todo.description && (
+      {todo.descriptionHtml && (
         <div
+          className="wiki-content"
           style={{
             fontSize: 11,
             color: "var(--ink3)",
             marginTop: 4,
-            whiteSpace: "pre-wrap",
             display: "-webkit-box",
             WebkitLineClamp: 3,
             WebkitBoxOrient: "vertical",
             overflow: "hidden",
           }}
-        >
-          {todo.description}
-        </div>
+          dangerouslySetInnerHTML={{ __html: todo.descriptionHtml }}
+        />
       )}
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
         <span style={{ fontSize: 10, fontWeight: 500, padding: "1px 7px", borderRadius: 999, background: tagBg, color: tagFg }}>{todo.tag}</span>
@@ -752,12 +753,9 @@ export function TodosClient({ todos, canWrite, googleEvents = [] }: { todos: Tod
               </option>
             ))}
           </select>
-          <textarea
-            name="description"
-            placeholder="설명 (선택)"
-            rows={1}
-            style={{ flex: "1 1 100%", padding: 9, border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel2)", color: "var(--ink)", fontSize: 12.5, resize: "vertical", fontFamily: "inherit" }}
-          />
+          <div style={{ flex: "1 1 100%" }}>
+            <RichTextEditor name="description" />
+          </div>
           <button type="submit" style={{ height: 32, padding: "0 14px", border: 0, borderRadius: 6, background: "var(--accent)", color: "var(--on-accent)", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>
             추가
           </button>
