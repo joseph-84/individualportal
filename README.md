@@ -70,7 +70,7 @@
 4. **APIs & Services → Credentials → Create Credentials → OAuth client ID**를 선택합니다.
    - Application type: **Web application**
    - Authorized redirect URIs에 다음을 정확히 추가합니다:
-     - `https://<실제 배포 도메인>/api/integrations/google/callback` (예: `https://portal.joseph84.freeddns.org/api/integrations/google/callback`)
+     - `https://<실제 배포 도메인>/api/integrations/google/callback` (예: `https://portal.example.com/api/integrations/google/callback`)
      - 로컬 개발도 함께 쓰려면 `http://localhost:3000/api/integrations/google/callback`도 추가
    - 생성 후 발급되는 **클라이언트 ID**와 **클라이언트 보안 비밀(Client secret)**을 복사합니다.
 5. `.env`에 다음을 채웁니다:
