@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requirePerm } from "@/lib/guard";
 import { isTodoStatus } from "@/lib/todo-status";
-import { isEmptyRichText } from "@/lib/rich-text";
+import { isEmptyRichText, toggleTaskItemChecked } from "@/lib/rich-text";
 
 function descriptionField(formData: FormData): string | null {
   const raw = String(formData.get("description") || "");
@@ -24,6 +24,20 @@ export async function toggleTodoAction(id: string) {
   await prisma.todo.update({ where: { id }, data: { status: todo.status === "done" ? "todo" : "done" } });
   revalidatePath("/dashboard");
   revalidatePath("/todos");
+}
+
+/** Toggles the Nth task-item checkbox (0-indexed, in document order) within a todo's
+ * description -- lets the list/Kanban read-only render check items off without opening the
+ * full editor. No-op if the description has no task item at that index. */
+export async function toggleDescriptionCheckboxAction(id: string, checkboxIndex: number) {
+  await requirePerm("todos", 2);
+  const todo = await prisma.todo.findUniqueOrThrow({ where: { id } });
+  if (!todo.description) return;
+  const updated = toggleTaskItemChecked(todo.description, checkboxIndex);
+  if (updated === todo.description) return;
+  await prisma.todo.update({ where: { id }, data: { description: updated } });
+  revalidatePath("/todos");
+  revalidatePath("/dashboard");
 }
 
 export async function createTodoAction(formData: FormData) {

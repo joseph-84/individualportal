@@ -1,7 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition, useActionState } from "react";
-import { createTodoAction, deleteTodoAction, editTodoAction, reorderTodoAction, moveTodoAction, type EditTodoState } from "@/app/actions/todos";
+import {
+  createTodoAction,
+  deleteTodoAction,
+  editTodoAction,
+  reorderTodoAction,
+  moveTodoAction,
+  toggleDescriptionCheckboxAction,
+  type EditTodoState,
+} from "@/app/actions/todos";
 import { TodoCheckbox } from "./TodoCheckbox";
 import { RichTextEditor } from "./RichTextEditor";
 
@@ -109,6 +117,20 @@ interface DragState {
   parentId: string | null;
 }
 
+/** Event-delegation click handler for a description block rendered via dangerouslySetInnerHTML:
+ * if the click landed on a task-item checkbox, figures out its index among all checkboxes in
+ * this description and persists the toggle. The browser's own native checkbox behavior handles
+ * the immediate visual flip; the server action + revalidatePath reconciles it afterward. */
+function handleDescriptionClick(e: React.MouseEvent<HTMLDivElement>, todoId: string, canWrite: boolean, startTransition: (cb: () => void) => void) {
+  if (!canWrite) return;
+  const target = e.target as HTMLElement;
+  if (target.tagName !== "INPUT" || (target as HTMLInputElement).type !== "checkbox") return;
+  const checkboxes = Array.from(e.currentTarget.querySelectorAll('input[type="checkbox"]'));
+  const idx = checkboxes.indexOf(target as HTMLInputElement);
+  if (idx === -1) return;
+  startTransition(() => toggleDescriptionCheckboxAction(todoId, idx));
+}
+
 function TodoRow({
   todo,
   depth,
@@ -213,6 +235,7 @@ function TodoRow({
             <div
               className="wiki-content rich-text-content"
               style={{ fontSize: 11.5, color: "var(--ink3)", marginTop: 2 }}
+              onClick={(e) => handleDescriptionClick(e, todo.id, canWrite, startTransition)}
               dangerouslySetInnerHTML={{ __html: todo.descriptionHtml }}
             />
           )}
@@ -413,6 +436,7 @@ function KanbanCard({
       {todo.descriptionHtml && (
         <div
           className="wiki-content rich-text-content"
+          onClick={(e) => handleDescriptionClick(e, todo.id, canWrite, startTransition)}
           style={{
             fontSize: 11,
             color: "var(--ink3)",
