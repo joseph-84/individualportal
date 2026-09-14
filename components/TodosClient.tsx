@@ -339,6 +339,7 @@ interface KanbanDropTarget {
 
 function KanbanCard({
   todo,
+  byParent,
   canWrite,
   dragged,
   setDragged,
@@ -349,6 +350,7 @@ function KanbanCard({
   onDropOnCard,
 }: {
   todo: TodoItem;
+  byParent: Map<string, TodoItem[]>;
   canWrite: boolean;
   dragged: KanbanDragState | null;
   setDragged: (d: KanbanDragState | null) => void;
@@ -361,6 +363,8 @@ function KanbanCard({
   const [, startTransition] = useTransition();
   const [dragArmed, setDragArmed] = useState(false);
   const [tagBg, tagFg] = CHIP[todo.tag] || CHIP.개인;
+  const children = byParent.get(todo.id) || [];
+  const doneChildren = children.filter((c) => c.status === "done").length;
   const canAcceptDrop = canWrite && dragged && dragged.id !== todo.id;
   const isTop = canAcceptDrop && dropTarget?.id === todo.id && dropTarget.pos === "before";
   const isBottom = canAcceptDrop && dropTarget?.id === todo.id && dropTarget.pos === "after";
@@ -424,7 +428,9 @@ function KanbanCard({
               ✎
             </button>
             <button
-              onClick={() => confirm(`"${todo.title}"을(를) 삭제할까요?`) && startTransition(() => deleteTodoAction(todo.id))}
+              onClick={() =>
+                confirm(`"${todo.title}"을(를) 삭제할까요?${children.length ? " 하위 할일도 함께 삭제됩니다." : ""}`) && startTransition(() => deleteTodoAction(todo.id))
+              }
               title="삭제"
               style={{ width: 19, height: 19, border: 0, background: "transparent", color: "var(--ink3)", cursor: "pointer", fontSize: 10.5 }}
             >
@@ -458,6 +464,39 @@ function KanbanCard({
         )}
         {todo.repeat && <span style={{ fontSize: 10.5, color: "var(--ink3)", fontFamily: "var(--font-mono), monospace" }}>↻{todo.repeat}</span>}
       </div>
+      {children.length > 0 && (
+        <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--line)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
+            <div style={{ flex: 1, height: 4, borderRadius: 999, background: "var(--panel3)", overflow: "hidden" }}>
+              <div style={{ width: `${(doneChildren / children.length) * 100}%`, height: "100%", background: "var(--ok)" }} />
+            </div>
+            <span style={{ fontSize: 10, color: "var(--ink3)", fontFamily: "var(--font-mono), monospace", flex: "none" }}>
+              {doneChildren}/{children.length}
+            </span>
+          </div>
+          <div style={{ display: "grid", gap: 3 }}>
+            {children.map((c) => (
+              <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 6 }} onClick={(e) => e.stopPropagation()}>
+                <TodoCheckbox id={c.id} done={c.status === "done"} canWrite={canWrite} />
+                <span
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    fontSize: 11,
+                    color: c.status === "done" ? "var(--ink3)" : "var(--ink2)",
+                    textDecoration: c.status === "done" ? "line-through" : "none",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {c.title}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -466,6 +505,7 @@ function KanbanColumn({
   status,
   label,
   cards,
+  byParent,
   canWrite,
   dragged,
   setDragged,
@@ -479,6 +519,7 @@ function KanbanColumn({
   status: string;
   label: string;
   cards: TodoItem[];
+  byParent: Map<string, TodoItem[]>;
   canWrite: boolean;
   dragged: KanbanDragState | null;
   setDragged: (d: KanbanDragState | null) => void;
@@ -512,6 +553,7 @@ function KanbanColumn({
           <KanbanCard
             key={c.id}
             todo={c}
+            byParent={byParent}
             canWrite={canWrite}
             dragged={dragged}
             setDragged={setDragged}
@@ -819,6 +861,7 @@ export function TodosClient({ todos, canWrite, googleEvents = [] }: { todos: Tod
                 status={s.key}
                 label={s.label}
                 cards={kanbanColumns[s.key] || []}
+                byParent={byParent}
                 canWrite={canWrite}
                 dragged={kanbanDragged}
                 setDragged={setKanbanDragged}
