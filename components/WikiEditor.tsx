@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { marked } from "marked";
 import { saveNoteAction, deleteNoteAction } from "@/app/actions/wiki";
+import { WikiHtmlEditor } from "./WikiHtmlEditor";
 
 interface Props {
   noteId: string;
@@ -19,24 +20,14 @@ function seg(on: boolean): [string, string] {
   return on ? ["var(--panel)", "var(--ink)"] : ["transparent", "var(--ink2)"];
 }
 
-const MD_TOOLBAR: { label: string; before: string; after: string; block?: boolean }[] = [
+const MD_TOOLBAR: { label: string; before: string; after: string; block?: boolean; extra?: boolean }[] = [
   { label: "H1", before: "# ", after: "", block: true },
   { label: "H2", before: "## ", after: "", block: true },
   { label: "B", before: "**", after: "**" },
   { label: "I", before: "_", after: "_" },
   { label: "“ ”", before: "> ", after: "", block: true },
   { label: "</>", before: "`", after: "`" },
-  { label: "표", before: "\n| 열1 | 열2 |\n| --- | --- |\n| 값1 | 값2 |\n", after: "" },
-];
-
-const HTML_TOOLBAR: { label: string; before: string; after: string; block?: boolean }[] = [
-  { label: "H1", before: "<h1>", after: "</h1>" },
-  { label: "H2", before: "<h2>", after: "</h2>" },
-  { label: "B", before: "<strong>", after: "</strong>" },
-  { label: "I", before: "<em>", after: "</em>" },
-  { label: "P", before: "<p>", after: "</p>" },
-  { label: "</>", before: "<code>", after: "</code>" },
-  { label: "표", before: "\n<table><tr><th>열1</th><th>열2</th></tr><tr><td>값1</td><td>값2</td></tr></table>\n", after: "" },
+  { label: "표", before: "\n| 열1 | 열2 |\n| --- | --- |\n| 값1 | 값2 |\n", after: "", extra: true },
 ];
 
 export function WikiEditor({ noteId, path, title, format, content, html, updatedAt, canWrite }: Props) {
@@ -45,10 +36,10 @@ export function WikiEditor({ noteId, path, title, format, content, html, updated
   const [pending, startTransition] = useTransition();
   const [deleting, startDelete] = useTransition();
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false);
   const [viewBg, viewFg] = seg(mode === "view");
   const [editBg, editFg] = seg(mode === "edit");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const toolbar = format === "html" ? HTML_TOOLBAR : MD_TOOLBAR;
 
   const save = () => {
     startTransition(async () => {
@@ -79,7 +70,7 @@ export function WikiEditor({ noteId, path, title, format, content, html, updated
     startDelete(() => deleteNoteAction(noteId));
   };
 
-  const livePreviewHtml = format === "html" ? source : (marked.parse(source, { async: false }) as string);
+  const livePreviewHtml = format === "md" ? (marked.parse(source, { async: false }) as string) : "";
 
   return (
     <>
@@ -106,6 +97,24 @@ export function WikiEditor({ noteId, path, title, format, content, html, updated
                   에디터
                 </button>
               </div>
+              {mode === "edit" && (
+                <button
+                  onClick={save}
+                  disabled={pending}
+                  style={{ height: 26, padding: "0 12px", border: 0, borderRadius: 6, background: "var(--accent)", color: "var(--on-accent)", fontSize: 12, fontWeight: 600, cursor: pending ? "default" : "pointer", opacity: pending ? 0.6 : 1 }}
+                >
+                  저장
+                </button>
+              )}
+              {mode === "edit" && format === "md" && (
+                <button
+                  className="wiki-mobile-preview-btn"
+                  onClick={() => setMobilePreviewOpen(true)}
+                  style={{ height: 26, padding: "0 10px", border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel)", color: "var(--ink2)", fontSize: 11.5, cursor: "pointer" }}
+                >
+                  미리보기
+                </button>
+              )}
               <button
                 onClick={remove}
                 disabled={deleting}
@@ -126,29 +135,27 @@ export function WikiEditor({ noteId, path, title, format, content, html, updated
         </article>
       )}
 
-      {mode === "edit" && canWrite && (
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)" }}>
+      {mode === "edit" && canWrite && format === "html" && (
+        <div style={{ padding: "18px 20px" }}>
+          <WikiHtmlEditor defaultValue={source} onChange={setSource} />
+        </div>
+      )}
+
+      {mode === "edit" && canWrite && format === "md" && (
+        <div className="wiki-editor-split" style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)" }}>
           <div style={{ borderRight: "1px solid var(--line)" }}>
-            <div style={{ display: "flex", gap: 4, padding: "7px 10px", borderBottom: "1px solid var(--line2)", background: "var(--panel2)", justifyContent: "space-between" }}>
-              <div style={{ display: "flex", gap: 4 }}>
-                {toolbar.map((t) => (
-                  <button
-                    key={t.label}
-                    type="button"
-                    onClick={() => insert(t.before, t.after, t.block)}
-                    style={{ minWidth: 26, height: 24, padding: "0 7px", border: "1px solid var(--line)", borderRadius: 5, background: "var(--panel)", color: "var(--ink2)", fontFamily: "var(--font-mono), monospace", fontSize: 11.5, cursor: "pointer" }}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-              <button
-                onClick={save}
-                disabled={pending}
-                style={{ height: 26, padding: "0 12px", border: 0, borderRadius: 6, background: "var(--accent)", color: "var(--on-accent)", fontSize: 12, fontWeight: 600, cursor: pending ? "default" : "pointer", opacity: pending ? 0.6 : 1 }}
-              >
-                저장
-              </button>
+            <div style={{ display: "flex", gap: 4, padding: "7px 10px", borderBottom: "1px solid var(--line2)", background: "var(--panel2)" }}>
+              {MD_TOOLBAR.map((t) => (
+                <button
+                  key={t.label}
+                  type="button"
+                  className={t.extra ? "wiki-toolbar-extra" : undefined}
+                  onClick={() => insert(t.before, t.after, t.block)}
+                  style={{ minWidth: 26, height: 24, padding: "0 7px", border: "1px solid var(--line)", borderRadius: 5, background: "var(--panel)", color: "var(--ink2)", fontFamily: "var(--font-mono), monospace", fontSize: 11.5, cursor: "pointer" }}
+                >
+                  {t.label}
+                </button>
+              ))}
             </div>
             <textarea
               ref={textareaRef}
@@ -158,11 +165,37 @@ export function WikiEditor({ noteId, path, title, format, content, html, updated
               style={{ width: "100%", height: 440, border: 0, padding: "16px 18px", resize: "none", outline: "none", background: "var(--panel)", color: "var(--ink2)", fontFamily: "var(--font-mono), monospace", fontSize: 12.5, lineHeight: 1.85 }}
             />
           </div>
-          <div style={{ padding: "18px 20px", overflow: "auto", maxHeight: 480 }}>
+          <div className="wiki-preview-pane" style={{ padding: "18px 20px", overflow: "auto", maxHeight: 480 }}>
             <div style={{ fontFamily: "var(--font-mono), monospace", fontSize: 10, fontWeight: 600, letterSpacing: ".1em", color: "var(--ink3)", marginBottom: 12 }}>
               PREVIEW
             </div>
             <div className="wiki-content" style={{ color: "var(--ink2)", fontSize: 13.5, lineHeight: 1.7 }} dangerouslySetInnerHTML={{ __html: livePreviewHtml }} />
+          </div>
+        </div>
+      )}
+
+      {mobilePreviewOpen && (
+        <div
+          className="wiki-mobile-preview-backdrop"
+          onClick={() => setMobilePreviewOpen(false)}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 80, display: "flex", alignItems: "flex-end" }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: "var(--panel)", borderRadius: "14px 14px 0 0", width: "100%", maxHeight: "82vh", overflow: "auto", boxShadow: "0 -8px 28px rgba(0,0,0,.3)" }}
+          >
+            <div style={{ position: "sticky", top: 0, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px", borderBottom: "1px solid var(--line)", background: "var(--panel)" }}>
+              <span style={{ fontFamily: "var(--font-mono), monospace", fontSize: 10, fontWeight: 600, letterSpacing: ".1em", color: "var(--ink3)" }}>PREVIEW</span>
+              <button
+                onClick={() => setMobilePreviewOpen(false)}
+                style={{ width: 26, height: 26, border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel2)", color: "var(--ink2)", fontSize: 13, cursor: "pointer" }}
+              >
+                ✕
+              </button>
+            </div>
+            <div style={{ padding: "16px 18px 28px" }}>
+              <div className="wiki-content" style={{ color: "var(--ink2)", fontSize: 13.5, lineHeight: 1.7 }} dangerouslySetInnerHTML={{ __html: livePreviewHtml }} />
+            </div>
           </div>
         </div>
       )}
