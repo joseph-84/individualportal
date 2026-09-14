@@ -41,7 +41,9 @@ const STATUS_COLUMNS = [
 ] as const;
 const STATUS_LABEL: Record<string, string> = { todo: "할 일", in_progress: "진행중", done: "완료" };
 const STATUS_BADGE: Record<string, [string, string]> = {
+  todo: ["var(--panel3)", "var(--ink2)"],
   in_progress: ["var(--warn-soft)", "var(--warn)"],
+  done: ["var(--ok-soft)", "var(--ok)"],
 };
 
 function seg(on: boolean): [string, string] {
@@ -168,6 +170,7 @@ function TodoRow({
   const editing = editingId === todo.id;
   const adding = addingParentId === todo.id;
   const children = byParent.get(todo.id) || [];
+  const doneChildren = children.filter((c) => c.status === "done").length;
 
   const canAcceptDrop = canWrite && dragged && dragged.parentId === (todo.parentId ?? null) && dragged.id !== todo.id;
   const showTopLine = canAcceptDrop && dropTarget?.id === todo.id && dropTarget.pos === "before";
@@ -244,6 +247,16 @@ function TodoRow({
             {todo.dueAt && <span>{new Date(todo.dueAt).toLocaleDateString("ko-KR", { month: "2-digit", day: "2-digit" })}</span>}
             {todo.repeat && <span>↻{todo.repeat}</span>}
           </div>
+          {children.length > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4, maxWidth: 220 }}>
+              <div style={{ flex: 1, height: 4, borderRadius: 999, background: "var(--panel3)", overflow: "hidden" }}>
+                <div style={{ width: `${(doneChildren / children.length) * 100}%`, height: "100%", background: "var(--ok)" }} />
+              </div>
+              <span style={{ fontSize: 10, color: "var(--ink3)", fontFamily: "var(--font-mono), monospace", flex: "none" }}>
+                {doneChildren}/{children.length}
+              </span>
+            </div>
+          )}
         </div>
         {STATUS_BADGE[todo.status] && (
           <span
@@ -347,6 +360,8 @@ function KanbanCard({
   setDropTarget,
   editingId,
   setEditingId,
+  addingParentId,
+  setAddingParentId,
   onDropOnCard,
 }: {
   todo: TodoItem;
@@ -358,6 +373,8 @@ function KanbanCard({
   setDropTarget: (d: KanbanDropTarget | null) => void;
   editingId: string | null;
   setEditingId: (id: string | null) => void;
+  addingParentId: string | null;
+  setAddingParentId: (id: string | null) => void;
   onDropOnCard: (targetId: string, status: string, pos: "before" | "after") => void;
 }) {
   const [, startTransition] = useTransition();
@@ -365,6 +382,7 @@ function KanbanCard({
   const [tagBg, tagFg] = CHIP[todo.tag] || CHIP.개인;
   const children = byParent.get(todo.id) || [];
   const doneChildren = children.filter((c) => c.status === "done").length;
+  const adding = addingParentId === todo.id;
   const canAcceptDrop = canWrite && dragged && dragged.id !== todo.id;
   const isTop = canAcceptDrop && dropTarget?.id === todo.id && dropTarget.pos === "before";
   const isBottom = canAcceptDrop && dropTarget?.id === todo.id && dropTarget.pos === "after";
@@ -424,6 +442,9 @@ function KanbanCard({
         </div>
         {canWrite && (
           <div style={{ display: "flex", gap: 3, flex: "none" }}>
+            <button onClick={() => setAddingParentId(adding ? null : todo.id)} title="하위 할일 추가" style={{ width: 19, height: 19, border: 0, background: "transparent", color: "var(--ink3)", cursor: "pointer", fontSize: 12 }}>
+              +
+            </button>
             <button onClick={() => setEditingId(todo.id)} title="편집" style={{ width: 19, height: 19, border: 0, background: "transparent", color: "var(--ink3)", cursor: "pointer", fontSize: 10.5 }}>
               ✎
             </button>
@@ -464,6 +485,28 @@ function KanbanCard({
         )}
         {todo.repeat && <span style={{ fontSize: 10.5, color: "var(--ink3)", fontFamily: "var(--font-mono), monospace" }}>↻{todo.repeat}</span>}
       </div>
+      {adding && (
+        <form
+          action={(fd) => {
+            startTransition(() => createTodoAction(fd));
+            setAddingParentId(null);
+          }}
+          onClick={(e) => e.stopPropagation()}
+          style={{ display: "flex", gap: 5, marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--line)", flexWrap: "wrap" }}
+        >
+          <input type="hidden" name="parentId" value={todo.id} />
+          <input
+            name="title"
+            placeholder="하위 할일 제목"
+            required
+            autoFocus
+            style={{ flex: 1, minWidth: 100, height: 26, padding: "0 7px", border: "1px solid var(--line)", borderRadius: 5, background: "var(--panel2)", color: "var(--ink)", fontSize: 11.5 }}
+          />
+          <button type="submit" style={{ height: 26, padding: "0 10px", border: 0, borderRadius: 5, background: "var(--accent)", color: "var(--on-accent)", fontSize: 11.5, fontWeight: 600, cursor: "pointer" }}>
+            추가
+          </button>
+        </form>
+      )}
       {children.length > 0 && (
         <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--line)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
@@ -513,6 +556,8 @@ function KanbanColumn({
   setDropTarget,
   editingId,
   setEditingId,
+  addingParentId,
+  setAddingParentId,
   onDropOnCard,
   onDropOnColumn,
 }: {
@@ -527,6 +572,8 @@ function KanbanColumn({
   setDropTarget: (d: KanbanDropTarget | null) => void;
   editingId: string | null;
   setEditingId: (id: string | null) => void;
+  addingParentId: string | null;
+  setAddingParentId: (id: string | null) => void;
   onDropOnCard: (targetId: string, status: string, pos: "before" | "after") => void;
   onDropOnColumn: (status: string) => void;
 }) {
@@ -561,6 +608,8 @@ function KanbanColumn({
             setDropTarget={setDropTarget}
             editingId={editingId}
             setEditingId={setEditingId}
+            addingParentId={addingParentId}
+            setAddingParentId={setAddingParentId}
             onDropOnCard={onDropOnCard}
           />
         ))}
@@ -869,6 +918,8 @@ export function TodosClient({ todos, canWrite, googleEvents = [] }: { todos: Tod
                 setDropTarget={setKanbanDropTarget}
                 editingId={editingId}
                 setEditingId={setEditingId}
+                addingParentId={addingParentId}
+                setAddingParentId={setAddingParentId}
                 onDropOnCard={(targetId, status, pos) => moveKanbanCard(status, targetId, pos)}
                 onDropOnColumn={(status) => moveKanbanCard(status, null, "after")}
               />
