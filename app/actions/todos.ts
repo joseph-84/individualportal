@@ -16,12 +16,29 @@ async function nextOrder(parentId: string | null): Promise<number> {
   return (last?.order ?? 0) + 1000;
 }
 
-/** Quick checkbox toggle: flips between "done" and "todo" (used by the list/dashboard
- * checkbox). Use updateTodoStatusAction/moveTodoAction for the full 3-state status. */
+/** After a todo's status changes, auto-complete its parent (and grandparent, ...) once every
+ * sibling under it is "done" -- one-directional (forward) only: un-completing a child later
+ * does not auto-revert a parent that was already auto-completed, the user can cycle it back
+ * manually via TodoStatusToggle same as any other status change. */
+async function cascadeParentCompletion(todoId: string): Promise<void> {
+  const todo = await prisma.todo.findUnique({ where: { id: todoId } });
+  if (!todo?.parentId) return;
+  const siblings = await prisma.todo.findMany({ where: { parentId: todo.parentId } });
+  if (siblings.length === 0 || !siblings.every((s) => s.status === "done")) return;
+  const parent = await prisma.todo.findUnique({ where: { id: todo.parentId } });
+  if (!parent || parent.status === "done") return;
+  await prisma.todo.update({ where: { id: parent.id }, data: { status: "done" } });
+  await cascadeParentCompletion(parent.id);
+}
+
+/** Quick checkbox toggle: flips between "done" and "todo" (used by the dashboard's compact
+ * todo checkbox). The list/Kanban views use TodoStatusToggle + updateTodoStatusAction for the
+ * full 3-state cycle instead. */
 export async function toggleTodoAction(id: string) {
   await requirePerm("todos", 2);
   const todo = await prisma.todo.findUniqueOrThrow({ where: { id } });
   await prisma.todo.update({ where: { id }, data: { status: todo.status === "done" ? "todo" : "done" } });
+  await cascadeParentCompletion(id);
   revalidatePath("/dashboard");
   revalidatePath("/todos");
 }
@@ -90,6 +107,7 @@ export async function editTodoAction(_prev: EditTodoState, formData: FormData): 
       status: isTodoStatus(statusRaw) ? statusRaw : "todo",
     },
   });
+  await cascadeParentCompletion(id);
   revalidatePath("/todos");
   revalidatePath("/dashboard");
   return {};
@@ -115,6 +133,7 @@ export async function updateTodoStatusAction(id: string, status: string) {
   await requirePerm("todos", 2);
   if (!isTodoStatus(status)) return;
   await prisma.todo.update({ where: { id }, data: { status } });
+  await cascadeParentCompletion(id);
   revalidatePath("/todos");
   revalidatePath("/dashboard");
 }
@@ -130,6 +149,7 @@ export async function moveTodoAction(id: string, status: string, beforeOrder: nu
   else if (afterOrder !== null) newOrder = afterOrder - 1000;
   else newOrder = 1000;
   await prisma.todo.update({ where: { id }, data: { status, order: newOrder } });
+  await cascadeParentCompletion(id);
   revalidatePath("/todos");
   revalidatePath("/dashboard");
 }

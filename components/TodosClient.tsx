@@ -10,7 +10,7 @@ import {
   toggleDescriptionCheckboxAction,
   type EditTodoState,
 } from "@/app/actions/todos";
-import { TodoCheckbox } from "./TodoCheckbox";
+import { TodoStatusToggle } from "./TodoStatusToggle";
 import { RichTextEditor } from "./RichTextEditor";
 
 interface TodoItem {
@@ -39,12 +39,6 @@ const STATUS_COLUMNS = [
   { key: "in_progress", label: "진행중" },
   { key: "done", label: "완료" },
 ] as const;
-const STATUS_LABEL: Record<string, string> = { todo: "할 일", in_progress: "진행중", done: "완료" };
-const STATUS_BADGE: Record<string, [string, string]> = {
-  todo: ["var(--panel3)", "var(--ink2)"],
-  in_progress: ["var(--warn-soft)", "var(--warn)"],
-  done: ["var(--ok-soft)", "var(--ok)"],
-};
 
 function seg(on: boolean): [string, string] {
   return on ? ["var(--panel)", "var(--ink)"] : ["transparent", "var(--ink2)"];
@@ -229,8 +223,8 @@ function TodoRow({
         ) : (
           <span style={{ width: 16, flex: "none" }} />
         )}
-        <div style={{ marginTop: 2 }}>
-          <TodoCheckbox id={todo.id} done={done} canWrite={canWrite} />
+        <div style={{ marginTop: 1 }}>
+          <TodoStatusToggle id={todo.id} status={todo.status} canWrite={canWrite} />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, color: done ? "var(--ink3)" : "var(--ink)", textDecoration: done ? "line-through" : "none" }}>{todo.title}</div>
@@ -258,21 +252,6 @@ function TodoRow({
             </div>
           )}
         </div>
-        {STATUS_BADGE[todo.status] && (
-          <span
-            style={{
-              fontSize: 10.5,
-              fontWeight: 500,
-              padding: "2px 8px",
-              borderRadius: 999,
-              background: STATUS_BADGE[todo.status][0],
-              color: STATUS_BADGE[todo.status][1],
-              flex: "none",
-            }}
-          >
-            {STATUS_LABEL[todo.status]}
-          </span>
-        )}
         <span style={{ fontSize: 10.5, fontWeight: 500, padding: "2px 8px", borderRadius: 999, background: tagBg, color: tagFg, flex: "none" }}>{todo.tag}</span>
         {canWrite && (
           <div style={{ display: "flex", gap: 4, flex: "none" }}>
@@ -520,7 +499,7 @@ function KanbanCard({
           <div style={{ display: "grid", gap: 3 }}>
             {children.map((c) => (
               <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 6 }} onClick={(e) => e.stopPropagation()}>
-                <TodoCheckbox id={c.id} done={c.status === "done"} canWrite={canWrite} />
+                <TodoStatusToggle id={c.id} status={c.status} canWrite={canWrite} compact />
                 <span
                   style={{
                     flex: 1,
