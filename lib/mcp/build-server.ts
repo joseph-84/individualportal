@@ -9,6 +9,7 @@ import { listScriptFiles, readScriptFile, writeScriptFile } from "@/lib/scripts-
 import { executeScript, ScriptRunError } from "@/lib/run-script";
 import { generateShareToken } from "@/lib/share";
 import { writeAudit } from "@/lib/audit";
+import { nextCompletedAt, cascadeParentCompletion } from "@/lib/todo-status";
 
 function ok(data: unknown): CallToolResult {
   return { content: [{ type: "text", text: typeof data === "string" ? data : JSON.stringify(data, null, 2) }] };
@@ -58,6 +59,7 @@ export function buildMcpServer(user: CurrentUser): McpServer {
     async (args) => {
       const parentId = args.parentId || null;
       const last = await prisma.todo.findFirst({ where: { parentId }, orderBy: { order: "desc" } });
+      const status = args.status || "todo";
       const todo = await prisma.todo.create({
         data: {
           title: args.title,
@@ -66,7 +68,8 @@ export function buildMcpServer(user: CurrentUser): McpServer {
           tag: args.tag || "업무",
           repeat: args.repeat || null,
           dueAt: args.dueAt ? new Date(args.dueAt) : null,
-          status: args.status || "todo",
+          status,
+          completedAt: status === "done" ? new Date() : null,
           order: (last?.order ?? 0) + 1000,
           parentId,
           ownerId: user.id,
@@ -92,11 +95,17 @@ export function buildMcpServer(user: CurrentUser): McpServer {
         status: z.enum(["todo", "in_progress", "done"]).optional(),
       },
     },
-    async ({ id, dueAt, ...rest }) => {
+    async ({ id, dueAt, status, ...rest }) => {
+      const existing = await prisma.todo.findUniqueOrThrow({ where: { id } });
       const todo = await prisma.todo.update({
         where: { id },
-        data: { ...rest, ...(dueAt !== undefined ? { dueAt: dueAt ? new Date(dueAt) : null } : {}) },
+        data: {
+          ...rest,
+          ...(dueAt !== undefined ? { dueAt: dueAt ? new Date(dueAt) : null } : {}),
+          ...(status !== undefined ? { status, completedAt: nextCompletedAt(status, existing.status, existing.completedAt) } : {}),
+        },
       });
+      await cascadeParentCompletion(id);
       return ok(todo);
     }
   );
