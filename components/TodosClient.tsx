@@ -39,11 +39,20 @@ function isHiddenOld(t: TodoItem): boolean {
   return Date.now() - new Date(t.completedAt).getTime() > HIDE_COMPLETED_AFTER_MS;
 }
 
-/** True if `t`'s title matches (case-insensitive substring), or any of its descendants' does --
- * lets a search for an old ticket's name surface its parent even when the parent's own title
- * doesn't match, since root-level filtering is what decides whether the whole branch renders. */
+/** `description` is rich-text HTML (Tiptap output) -- strip tags before substring-matching a
+ * search query against it so e.g. a literal "strong" from a stray `<strong>` tag can't produce
+ * a false match and multi-word phrases split across tags still read as plain text. */
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]+>/g, " ");
+}
+
+/** True if `t`'s title or description matches (case-insensitive substring), or any of its
+ * descendants' does -- lets a search for an old ticket's name or content surface its parent
+ * even when the parent's own title/description doesn't match, since root-level filtering is
+ * what decides whether the whole branch renders. */
 function subtreeMatchesText(t: TodoItem, query: string, byParent: Map<string, TodoItem[]>): boolean {
   if (t.title.toLowerCase().includes(query)) return true;
+  if (t.description && stripHtml(t.description).toLowerCase().includes(query)) return true;
   return (byParent.get(t.id) || []).some((c) => subtreeMatchesText(c, query, byParent));
 }
 
@@ -859,7 +868,7 @@ export function TodosClient({ todos, canWrite, googleEvents = [] }: { todos: Tod
         <input
           value={textFilter}
           onChange={(e) => setTextFilter(e.target.value)}
-          placeholder="🔍 제목으로 검색 (이전 티켓 찾기)"
+          placeholder="🔍 제목·설명 검색 (이전 티켓 찾기)"
           style={{ height: 30, minWidth: 170, padding: "0 11px", border: "1px solid var(--line)", borderRadius: 999, background: "var(--panel)", color: "var(--ink)", fontSize: 12 }}
         />
         {view === "list" && (
