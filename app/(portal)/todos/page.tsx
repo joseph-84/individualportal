@@ -29,6 +29,7 @@ export default async function TodosPage() {
         repeat: t.repeat,
         tag: t.tag || "개인",
         status: t.status,
+        completedAt: t.completedAt ? t.completedAt.toISOString() : null,
         order: t.order,
         parentId: t.parentId,
         dueAt: t.dueAt ? t.dueAt.toISOString() : null,

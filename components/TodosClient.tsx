@@ -22,9 +22,21 @@ interface TodoItem {
   repeat: string | null;
   tag: string;
   status: string;
+  completedAt: string | null;
   order: number;
   parentId: string | null;
   dueAt: string | null;
+}
+
+const HIDE_COMPLETED_AFTER_MS = 14 * 24 * 60 * 60 * 1000; // 2 weeks
+
+/** A todo that was marked "완료" more than 2 weeks ago -- hidden from Kanban unconditionally
+ * (recent completions still show normally there, only very old ones get dropped to keep the
+ * board from accumulating stale cards forever) and from the list unless the "숨겨진 항목 보기"
+ * filter is on. */
+function isHiddenOld(t: TodoItem): boolean {
+  if (t.status !== "done" || !t.completedAt) return false;
+  return Date.now() - new Date(t.completedAt).getTime() > HIDE_COMPLETED_AFTER_MS;
 }
 
 const CHIP: Record<string, [string, string]> = {
@@ -132,6 +144,7 @@ function TodoRow({
   depth,
   byParent,
   canWrite,
+  showHidden,
   editingId,
   setEditingId,
   addingParentId,
@@ -146,6 +159,7 @@ function TodoRow({
   depth: number;
   byParent: Map<string, TodoItem[]>;
   canWrite: boolean;
+  showHidden: boolean;
   editingId: string | null;
   setEditingId: (id: string | null) => void;
   addingParentId: string | null;
@@ -297,24 +311,27 @@ function TodoRow({
       )}
 
       {!collapsed &&
-        children.map((c) => (
-          <TodoRow
-            key={c.id}
-            todo={c}
-            depth={depth + 1}
-            byParent={byParent}
-            canWrite={canWrite}
-            editingId={editingId}
-            setEditingId={setEditingId}
-            addingParentId={addingParentId}
-            setAddingParentId={setAddingParentId}
-            dragged={dragged}
-            setDragged={setDragged}
-            dropTarget={dropTarget}
-            setDropTarget={setDropTarget}
-            onDrop={onDrop}
-          />
-        ))}
+        children
+          .filter((c) => showHidden || !isHiddenOld(c))
+          .map((c) => (
+            <TodoRow
+              key={c.id}
+              todo={c}
+              depth={depth + 1}
+              byParent={byParent}
+              canWrite={canWrite}
+              showHidden={showHidden}
+              editingId={editingId}
+              setEditingId={setEditingId}
+              addingParentId={addingParentId}
+              setAddingParentId={setAddingParentId}
+              dragged={dragged}
+              setDragged={setDragged}
+              dropTarget={dropTarget}
+              setDropTarget={setDropTarget}
+              onDrop={onDrop}
+            />
+          ))}
     </div>
   );
 }
@@ -497,7 +514,9 @@ function KanbanCard({
             </span>
           </div>
           <div style={{ display: "grid", gap: 3 }}>
-            {children.map((c) => (
+            {children
+              .filter((c) => !isHiddenOld(c))
+              .map((c) => (
               <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 6 }} onClick={(e) => e.stopPropagation()}>
                 <TodoStatusToggle id={c.id} status={c.status} canWrite={canWrite} compact />
                 <span
@@ -570,10 +589,13 @@ function KanbanColumn({
       }}
       style={{ background: "var(--panel2)", border: "1px solid var(--line)", borderRadius: 10, padding: 10, minHeight: 160, display: "flex", flexDirection: "column" }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, padding: "0 2px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: status === "done" ? 2 : 8, padding: "0 2px" }}>
         <span style={{ fontSize: 12.5, fontWeight: 600 }}>{label}</span>
         <span style={{ fontFamily: "var(--font-mono), monospace", fontSize: 11, color: "var(--ink3)" }}>{cards.length}</span>
       </div>
+      {status === "done" && (
+        <div style={{ fontSize: 10.5, color: "var(--ink3)", padding: "0 2px", marginBottom: 8 }}>완료 2주 경과 시 리스트에서만 표시</div>
+      )}
       <div style={{ flex: 1 }}>
         {cards.map((c) => (
           <KanbanCard
@@ -624,6 +646,7 @@ export function TodosClient({ todos, canWrite, googleEvents = [] }: { todos: Tod
   const [filter, setFilter] = useState<Filter>("전체");
   const [projectFilter, setProjectFilter] = useState<string | null>(null);
   const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [showHidden, setShowHidden] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [addingParentId, setAddingParentId] = useState<string | null>(null);
   const [dragged, setDragged] = useState<DragState | null>(null);
@@ -683,7 +706,10 @@ export function TodosClient({ todos, canWrite, googleEvents = [] }: { todos: Tod
   };
 
   const kanbanColumns = useMemo(() => {
-    const roots = (byParent.get("__root__") || []).filter(matchesFilters);
+    // Old completed cards never reappear on the board regardless of the "숨겨진 항목 보기"
+    // filter (that only applies to the list) -- keeps the 완료 column from accumulating
+    // months-old cards forever.
+    const roots = (byParent.get("__root__") || []).filter(matchesFilters).filter((t) => !isHiddenOld(t));
     const cols: Record<string, TodoItem[]> = { todo: [], in_progress: [], done: [] };
     for (const t of roots) (cols[t.status] || cols.todo).push(t);
     return cols;
@@ -718,9 +744,9 @@ export function TodosClient({ todos, canWrite, googleEvents = [] }: { todos: Tod
   };
 
   const filteredRoots = useMemo(() => {
-    return (byParent.get("__root__") || []).filter(matchesFilters);
+    return (byParent.get("__root__") || []).filter(matchesFilters).filter((t) => showHidden || !isHiddenOld(t));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [byParent, filter, projectFilter, tagFilter]);
+  }, [byParent, filter, projectFilter, tagFilter, showHidden]);
 
   const now = new Date();
   const year = now.getFullYear();
@@ -812,6 +838,24 @@ export function TodosClient({ todos, canWrite, googleEvents = [] }: { todos: Tod
             ))}
           </select>
         )}
+        {view === "list" && (
+          <button
+            onClick={() => setShowHidden((v) => !v)}
+            title="완료된 지 2주가 지나면 목록에서 자동으로 숨겨집니다. 눌러서 숨겨진 항목을 함께 봅니다."
+            style={{
+              padding: "5px 11px",
+              border: `1px solid ${showHidden ? "var(--accent)" : "var(--line)"}`,
+              borderRadius: 999,
+              background: showHidden ? "var(--accent-soft)" : "var(--panel)",
+              color: showHidden ? "var(--accent)" : "var(--ink2)",
+              fontSize: 12,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {showHidden ? "☑" : "☐"} 숨겨진 항목 보기
+          </button>
+        )}
         {canWrite && (
           <button
             onClick={() => setShowForm((v) => !v)}
@@ -866,6 +910,7 @@ export function TodosClient({ todos, canWrite, googleEvents = [] }: { todos: Tod
               depth={0}
               byParent={byParent}
               canWrite={canWrite}
+              showHidden={showHidden}
               editingId={editingId}
               setEditingId={setEditingId}
               addingParentId={addingParentId}

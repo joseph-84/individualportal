@@ -48,6 +48,8 @@ model Todo {
   repeat      String?
   dueAt       DateTime?
   status      String    @default("todo") // "todo" | "in_progress" | "done" -- kanban column
+  completedAt DateTime? // set when status transitions to "done", cleared otherwise -- drives the
+  // "hide 2+ weeks completed" list filter (see cascadeParentCompletion/status actions)
   order       Float     @default(0) // manual drag-and-drop order among siblings (same parentId)
   ownerId     String
   owner       User      @relation(fields: [ownerId], references: [id])
