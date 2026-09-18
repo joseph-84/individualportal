@@ -39,6 +39,14 @@ function isHiddenOld(t: TodoItem): boolean {
   return Date.now() - new Date(t.completedAt).getTime() > HIDE_COMPLETED_AFTER_MS;
 }
 
+/** True if `t`'s title matches (case-insensitive substring), or any of its descendants' does --
+ * lets a search for an old ticket's name surface its parent even when the parent's own title
+ * doesn't match, since root-level filtering is what decides whether the whole branch renders. */
+function subtreeMatchesText(t: TodoItem, query: string, byParent: Map<string, TodoItem[]>): boolean {
+  if (t.title.toLowerCase().includes(query)) return true;
+  return (byParent.get(t.id) || []).some((c) => subtreeMatchesText(c, query, byParent));
+}
+
 const CHIP: Record<string, [string, string]> = {
   업무: ["var(--accent-soft)", "var(--accent)"],
   반복: ["var(--ok-soft)", "var(--ok)"],
@@ -646,6 +654,7 @@ export function TodosClient({ todos, canWrite, googleEvents = [] }: { todos: Tod
   const [filter, setFilter] = useState<Filter>("전체");
   const [projectFilter, setProjectFilter] = useState<string | null>(null);
   const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [textFilter, setTextFilter] = useState("");
   const [showHidden, setShowHidden] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [addingParentId, setAddingParentId] = useState<string | null>(null);
@@ -705,16 +714,21 @@ export function TodosClient({ todos, canWrite, googleEvents = [] }: { todos: Tod
     return d >= new Date(now.getFullYear(), now.getMonth(), now.getDate()) && d <= weekEnd;
   };
 
+  const textQuery = textFilter.trim().toLowerCase();
+  // Actively searching for an old ticket by name should surface it even if it's hidden by age
+  // or buried a level down -- checked separately from matchesFilters since it needs byParent.
+  const matchesText = (t: TodoItem): boolean => !textQuery || subtreeMatchesText(t, textQuery, byParent);
+
   const kanbanColumns = useMemo(() => {
     // Old completed cards never reappear on the board regardless of the "숨겨진 항목 보기"
-    // filter (that only applies to the list) -- keeps the 완료 column from accumulating
-    // months-old cards forever.
-    const roots = (byParent.get("__root__") || []).filter(matchesFilters).filter((t) => !isHiddenOld(t));
+    // filter or a search query (those only apply to the list) -- keeps the 완료 column from
+    // accumulating months-old cards forever.
+    const roots = (byParent.get("__root__") || []).filter(matchesFilters).filter(matchesText).filter((t) => !isHiddenOld(t));
     const cols: Record<string, TodoItem[]> = { todo: [], in_progress: [], done: [] };
     for (const t of roots) (cols[t.status] || cols.todo).push(t);
     return cols;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [byParent, filter, projectFilter, tagFilter]);
+  }, [byParent, filter, projectFilter, tagFilter, textQuery]);
 
   const moveKanbanCard = (status: string, targetId: string | null, pos: "before" | "after") => {
     if (!kanbanDragged) return;
@@ -743,10 +757,14 @@ export function TodosClient({ todos, canWrite, googleEvents = [] }: { todos: Tod
     setKanbanDropTarget(null);
   };
 
+  // A search bypasses the "2주 지나면 숨김" rule too -- that's the whole point of searching for
+  // an old ticket, so requiring the user to also flip "숨겨진 항목 보기" would defeat it.
+  const effectiveShowHidden = showHidden || !!textQuery;
+
   const filteredRoots = useMemo(() => {
-    return (byParent.get("__root__") || []).filter(matchesFilters).filter((t) => showHidden || !isHiddenOld(t));
+    return (byParent.get("__root__") || []).filter(matchesFilters).filter(matchesText).filter((t) => effectiveShowHidden || !isHiddenOld(t));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [byParent, filter, projectFilter, tagFilter, showHidden]);
+  }, [byParent, filter, projectFilter, tagFilter, textQuery, effectiveShowHidden]);
 
   const now = new Date();
   const year = now.getFullYear();
@@ -838,22 +856,28 @@ export function TodosClient({ todos, canWrite, googleEvents = [] }: { todos: Tod
             ))}
           </select>
         )}
+        <input
+          value={textFilter}
+          onChange={(e) => setTextFilter(e.target.value)}
+          placeholder="🔍 제목으로 검색 (이전 티켓 찾기)"
+          style={{ height: 30, minWidth: 170, padding: "0 11px", border: "1px solid var(--line)", borderRadius: 999, background: "var(--panel)", color: "var(--ink)", fontSize: 12 }}
+        />
         {view === "list" && (
           <button
             onClick={() => setShowHidden((v) => !v)}
-            title="완료된 지 2주가 지나면 목록에서 자동으로 숨겨집니다. 눌러서 숨겨진 항목을 함께 봅니다."
+            title="완료된 지 2주가 지나면 목록에서 자동으로 숨겨집니다. 눌러서 숨겨진 항목을 함께 봅니다. 검색 중에는 항상 함께 표시됩니다."
             style={{
               padding: "5px 11px",
-              border: `1px solid ${showHidden ? "var(--accent)" : "var(--line)"}`,
+              border: `1px solid ${effectiveShowHidden ? "var(--accent)" : "var(--line)"}`,
               borderRadius: 999,
-              background: showHidden ? "var(--accent-soft)" : "var(--panel)",
-              color: showHidden ? "var(--accent)" : "var(--ink2)",
+              background: effectiveShowHidden ? "var(--accent-soft)" : "var(--panel)",
+              color: effectiveShowHidden ? "var(--accent)" : "var(--ink2)",
               fontSize: 12,
               cursor: "pointer",
               whiteSpace: "nowrap",
             }}
           >
-            {showHidden ? "☑" : "☐"} 숨겨진 항목 보기
+            {effectiveShowHidden ? "☑" : "☐"} 숨겨진 항목 보기
           </button>
         )}
         {canWrite && (
@@ -910,7 +934,7 @@ export function TodosClient({ todos, canWrite, googleEvents = [] }: { todos: Tod
               depth={0}
               byParent={byParent}
               canWrite={canWrite}
-              showHidden={showHidden}
+              showHidden={effectiveShowHidden}
               editingId={editingId}
               setEditingId={setEditingId}
               addingParentId={addingParentId}
