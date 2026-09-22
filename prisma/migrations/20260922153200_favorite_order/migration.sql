@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Favorite" ADD COLUMN     "order" DOUBLE PRECISION NOT NULL DEFAULT 0;
+

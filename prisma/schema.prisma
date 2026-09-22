@@ -34,6 +34,7 @@ model Favorite {
   title     String
   url       String
   folder    String   @default("")
+  order     Float    @default(0) // manual drag-and-drop order among siblings (same folder)
   ownerId   String
   owner     User     @relation(fields: [ownerId], references: [id])
   createdAt DateTime @default(now())
