@@ -9,24 +9,26 @@ datasource db {
 
 // Single-user portal: no roles/permissions. Being logged in grants full access.
 model User {
-  id               String      @id @default(cuid())
-  email            String      @unique
-  passwordHash     String
-  name             String
-  active           Boolean     @default(true)
-  lastLoginAt      DateTime?
-  failedLoginCount Int         @default(0)
-  lockedUntil      DateTime?
-  tokenVersion     Int         @default(0)
-  todos            Todo[]
-  notes            Note[]
-  checklists       Checklist[]
-  scriptRuns       ScriptRun[]
-  auditLogs        AuditLog[]
-  shareLinks       ShareLink[]
-  apiTokens        ApiToken[]
-  favorites        Favorite[]
-  createdAt        DateTime    @default(now())
+  id                 String                   @id @default(cuid())
+  email              String                   @unique
+  passwordHash       String
+  name               String
+  active             Boolean                  @default(true)
+  lastLoginAt        DateTime?
+  failedLoginCount   Int                      @default(0)
+  lockedUntil        DateTime?
+  tokenVersion       Int                      @default(0)
+  todos              Todo[]
+  notes              Note[]
+  checklists         Checklist[]
+  scriptRuns         ScriptRun[]
+  auditLogs          AuditLog[]
+  shareLinks         ShareLink[]
+  apiTokens          ApiToken[]
+  favorites          Favorite[]
+  oauthCodes         OAuthAuthorizationCode[]
+  oauthRefreshTokens OAuthRefreshToken[]
+  createdAt          DateTime                 @default(now())
 }
 
 model Favorite {
@@ -148,6 +150,47 @@ model ApiToken {
   revoked     Boolean   @default(false)
   lastUsedAt  DateTime?
   createdAt   DateTime  @default(now())
+}
+
+// MCP OAuth 2.1 (claude.ai 커넥터/모바일용) -- 기존 ApiToken 정적 토큰 방식과 별개로 동작하며
+// Claude Code/Desktop은 여전히 ApiToken을 그대로 쓴다. 퍼블릭 클라이언트(PKCE)만 지원하므로
+// client_secret은 저장하지 않는다.
+model OAuthClient {
+  id            String                   @id @default(cuid()) // = client_id
+  clientName    String
+  redirectUris  String[]
+  createdAt     DateTime                 @default(now())
+  codes         OAuthAuthorizationCode[]
+  refreshTokens OAuthRefreshToken[]
+}
+
+// 1회용, 단기 만료 인가 코드 (authorization_code grant 교환 전 단계).
+model OAuthAuthorizationCode {
+  code          String      @id @default(cuid())
+  clientId      String
+  client        OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  redirectUri   String
+  codeChallenge String
+  resource      String
+  userId        String
+  user          User        @relation(fields: [userId], references: [id])
+  used          Boolean     @default(false)
+  expiresAt     DateTime
+  createdAt     DateTime    @default(now())
+}
+
+// 액세스 토큰은 상태 없는 서명 JWT로 발급(lib/oauth.ts) -- 여기는 리프레시 토큰만 저장.
+// 사용할 때마다 회전(rotate): 기존 행은 revoked 처리하고 새 행을 발급한다.
+model OAuthRefreshToken {
+  id        String      @id @default(cuid())
+  tokenHash String      @unique
+  clientId  String
+  client    OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User        @relation(fields: [userId], references: [id])
+  resource  String
+  revoked   Boolean     @default(false)
+  createdAt DateTime    @default(now())
 }
 
 // Single row per external service the user has connected (Google Calendar, etc).
