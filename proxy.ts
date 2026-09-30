@@ -15,9 +15,20 @@ function externalOrigin(req: NextRequest): string {
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  if (pathname.startsWith("/_next") || pathname.startsWith("/api/") || pathname.startsWith("/mcp") || pathname.startsWith("/share/")) {
+  if (
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/api/") ||
+    pathname.startsWith("/mcp") ||
+    pathname.startsWith("/share/") ||
+    pathname.startsWith("/.well-known/") ||
+    pathname.startsWith("/oauth/")
+  ) {
     // API routes and MCP enforce their own auth (Bearer token / apiRequirePerm) and must
     // return JSON, not an HTML redirect. /share/* handles public vs. members-only itself.
+    // /.well-known/* (OAuth discovery metadata) and /oauth/* (register/authorize/token) are
+    // the MCP OAuth authorization server endpoints -- they must be reachable unauthenticated
+    // (a claude.ai connector fetches metadata before any login exists) and /oauth/authorize
+    // does its own login check + redirect-with-return-url instead of this generic redirect.
     return NextResponse.next();
   }
 

@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { Suspense, useActionState } from "react";
+import { useSearchParams } from "next/navigation";
 import { loginAction, type LoginState } from "@/app/actions/auth";
 import { useTheme } from "@/lib/theme-context";
 
@@ -11,6 +12,17 @@ const LOGIN_STATS = [
 
 const initialState: LoginState = {};
 
+/** useSearchParams() opts the page out of static prerendering unless isolated behind its own
+ * Suspense boundary -- kept in a tiny standalone component so the rest of the login page (the
+ * common case, no ?next=) still prerenders. Only set when arriving via /oauth/authorize's
+ * "please log in first" redirect (see app/oauth/authorize/page.tsx) -- loginAction validates
+ * this is actually an /oauth/authorize path before honoring it, so a crafted ?next= elsewhere
+ * can't be used as an open redirect. */
+function NextField() {
+  const next = useSearchParams().get("next") || "";
+  return next ? <input type="hidden" name="next" value={next} /> : null;
+}
+
 export function LoginScreen() {
   const { theme } = useTheme();
   const [state, formAction, pending] = useActionState(loginAction, initialState);
@@ -20,6 +32,9 @@ export function LoginScreen() {
       <div className="login-grid" style={{ minHeight: "100vh", display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "48px 40px" }}>
           <form action={formAction} style={{ width: "100%", maxWidth: 336 }}>
+            <Suspense fallback={null}>
+              <NextField />
+            </Suspense>
             <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 36 }}>
               <div
                 style={{

@@ -60,7 +60,11 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
     data: { lastLoginAt: new Date(), failedLoginCount: 0, lockedUntil: null },
   });
 
-  redirect("/dashboard");
+  // Only honor `next` when it's the MCP OAuth consent page redirecting here to get a login
+  // first (see app/oauth/authorize/page.tsx) -- restricting to this one prefix (rather than
+  // trusting any relative path) keeps this from being usable as an open redirect.
+  const next = String(formData.get("next") || "");
+  redirect(next.startsWith("/oauth/authorize?") ? next : "/dashboard");
 }
 
 export async function logoutAction() {
