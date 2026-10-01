@@ -18,6 +18,28 @@ function err(message: string): CallToolResult {
   return { content: [{ type: "text", text: message }], isError: true };
 }
 
+/** Shared preview-then-confirm gate for the destination-ambiguous "create" tools and the
+ * irreversible delete/run tools (same set the web UI already gates behind a JS confirm()
+ * dialog, plus run_script -- a wrong natural-language guess at *which* script to run is a
+ * bigger risk than a misclick on an already-visible button). An MCP client calling without
+ * confirm:true (the default/safe path) gets a text description of what *would* happen and
+ * nothing is changed; only confirm:true performs the actual mutation. This is enforced here
+ * server-side rather than relying on MCP "elicitation" (inconsistently supported across
+ * clients, unconfirmed on mobile) -- the calling model is instructed via each tool's
+ * description to present the preview to the user in chat and wait for explicit agreement
+ * before re-calling with confirm:true, but even a model that ignores that instruction can't
+ * skip the gate itself. */
+const CONFIRM_FIELD = {
+  confirm: z
+    .boolean()
+    .optional()
+    .describe(
+      "실제로 실행하려면 true로 설정하세요. 생략하거나 false면 아무것도 바꾸지 않고 무엇을 할 것인지 설명만 반환합니다 -- 반드시 먼저 사용자에게 계획을 말로 설명하고 명시적 동의를 받은 뒤에만 true로 다시 호출하세요."
+    ),
+};
+const CONFIRM_NOTE =
+  " confirm 없이(또는 false로) 먼저 호출해 계획을 확인하고, 그 내용을 사용자에게 보여준 뒤 동의를 받으면 confirm:true로 다시 호출하세요.";
+
 /** Builds a fresh McpServer bound to `user` — single-user portal, so any valid API
  * token grants full access to every tool (same as the web UI once logged in). */
 export function buildMcpServer(user: CurrentUser): McpServer {
@@ -44,7 +66,9 @@ export function buildMcpServer(user: CurrentUser): McpServer {
     "create_todo",
     {
       title: "할일 생성",
-      description: "새 할일을 생성합니다. parentId를 주면 하위 할일이 됩니다.",
+      description:
+        "새 할일을 생성합니다. parentId를 주면 하위 할일이 됩니다. 자연어 요청은 할일/체크리스트/위키 중 어디에 넣을지 애매한 경우가 많으므로," +
+        CONFIRM_NOTE,
       inputSchema: {
         title: z.string(),
         description: z.string().optional().describe("일반 텍스트 또는 HTML(굵게/목록/체크박스 등, 웹 UI의 리치 텍스트 에디터와 동일한 형식)"),
@@ -54,10 +78,17 @@ export function buildMcpServer(user: CurrentUser): McpServer {
         dueAt: z.string().optional().describe("ISO date, e.g. 2026-09-10"),
         status: z.enum(["todo", "in_progress", "done"]).optional().describe("칸반 상태. 기본값 todo."),
         parentId: z.string().optional(),
+        ...CONFIRM_FIELD,
       },
     },
     async (args) => {
       const parentId = args.parentId || null;
+      if (args.confirm !== true) {
+        return ok({
+          preview: true,
+          message: `아직 생성되지 않았습니다. 다음 내용으로 ${parentId ? "하위 할일을" : "할일을"} 생성하려 합니다: "${args.title}"${args.project ? ` (프로젝트: ${args.project})` : ""}${args.tag ? ` (태그: ${args.tag})` : ""}${args.dueAt ? ` (마감일: ${args.dueAt})` : ""}. 사용자에게 먼저 알리고 확인받은 후 confirm:true로 다시 호출하세요.`,
+        });
+      }
       const last = await prisma.todo.findFirst({ where: { parentId }, orderBy: { order: "desc" } });
       const status = args.status || "todo";
       const todo = await prisma.todo.create({
@@ -138,10 +169,22 @@ export function buildMcpServer(user: CurrentUser): McpServer {
     }
   );
 
-  server.registerTool("delete_todo", { title: "할일 삭제", description: "할일을 삭제합니다 (하위 할일도 함께 삭제).", inputSchema: { id: z.string() } }, async ({ id }) => {
-    await prisma.todo.delete({ where: { id } });
-    return ok({ deleted: id });
-  });
+  server.registerTool(
+    "delete_todo",
+    { title: "할일 삭제", description: "할일을 삭제합니다 (하위 할일도 함께 삭제, 되돌릴 수 없음)." + CONFIRM_NOTE, inputSchema: { id: z.string(), ...CONFIRM_FIELD } },
+    async ({ id, confirm }) => {
+      const todo = await prisma.todo.findUnique({ where: { id }, include: { children: true } });
+      if (!todo) return err("할일을 찾을 수 없습니다.");
+      if (confirm !== true) {
+        return ok({
+          preview: true,
+          message: `"${todo.title}"을(를) 삭제하려 합니다.${todo.children.length ? ` 하위 할일 ${todo.children.length}개도 함께 삭제됩니다.` : ""} 되돌릴 수 없습니다. 사용자에게 먼저 알리고 확인받은 후 confirm:true로 다시 호출하세요.`,
+        });
+      }
+      await prisma.todo.delete({ where: { id } });
+      return ok({ deleted: id });
+    }
+  );
 
   // ---------- wiki ----------
   server.registerTool("list_notes", { title: "위키 문서 목록", description: "위키 문서 목록을 조회합니다.", inputSchema: { folder: z.string().optional() } }, async ({ folder }) => {
@@ -159,10 +202,23 @@ export function buildMcpServer(user: CurrentUser): McpServer {
     "create_note",
     {
       title: "위키 문서 생성",
-      description: "새 위키 문서를 만듭니다. format은 md 또는 html.",
-      inputSchema: { title: z.string(), folder: z.string().optional(), tags: z.array(z.string()).optional(), format: z.enum(["md", "html"]).optional(), content: z.string().optional() },
+      description: "새 위키 문서를 만듭니다. format은 md 또는 html. 자연어 요청은 할일/체크리스트/위키 중 어디에 넣을지 애매한 경우가 많으므로," + CONFIRM_NOTE,
+      inputSchema: {
+        title: z.string(),
+        folder: z.string().optional(),
+        tags: z.array(z.string()).optional(),
+        format: z.enum(["md", "html"]).optional(),
+        content: z.string().optional(),
+        ...CONFIRM_FIELD,
+      },
     },
     async (args) => {
+      if (args.confirm !== true) {
+        return ok({
+          preview: true,
+          message: `아직 생성되지 않았습니다. 다음 내용으로 위키 문서를 생성하려 합니다: "${args.title}"${args.folder ? ` (폴더: ${args.folder})` : ""} (format: ${args.format || "md"}). 사용자에게 먼저 알리고 확인받은 후 confirm:true로 다시 호출하세요.`,
+        });
+      }
       const format = args.format || "md";
       const content = args.content ?? (format === "html" ? `<h1>${args.title}</h1>\n<p></p>\n` : `# ${args.title}\n\n`);
       const note = await prisma.note.create({ data: { title: args.title, folder: args.folder || "", tags: args.tags || [], format, content, ownerId: user.id } });
@@ -175,10 +231,19 @@ export function buildMcpServer(user: CurrentUser): McpServer {
     return ok(note);
   });
 
-  server.registerTool("delete_note", { title: "위키 문서 삭제", description: "위키 문서를 삭제합니다.", inputSchema: { id: z.string() } }, async ({ id }) => {
-    await prisma.note.delete({ where: { id } });
-    return ok({ deleted: id });
-  });
+  server.registerTool(
+    "delete_note",
+    { title: "위키 문서 삭제", description: "위키 문서를 삭제합니다 (되돌릴 수 없음)." + CONFIRM_NOTE, inputSchema: { id: z.string(), ...CONFIRM_FIELD } },
+    async ({ id, confirm }) => {
+      const note = await prisma.note.findUnique({ where: { id } });
+      if (!note) return err("문서를 찾을 수 없습니다.");
+      if (confirm !== true) {
+        return ok({ preview: true, message: `"${note.title}" 문서를 삭제하려 합니다. 되돌릴 수 없습니다. 사용자에게 먼저 알리고 확인받은 후 confirm:true로 다시 호출하세요.` });
+      }
+      await prisma.note.delete({ where: { id } });
+      return ok({ deleted: id });
+    }
+  );
 
   // ---------- checklists ----------
   server.registerTool("list_checklists", { title: "체크리스트 목록", description: "체크리스트 문서 목록을 조회합니다.", inputSchema: { folder: z.string().optional() } }, async ({ folder }) => {
@@ -196,10 +261,18 @@ export function buildMcpServer(user: CurrentUser): McpServer {
     "create_checklist",
     {
       title: "체크리스트 생성",
-      description: "새 체크리스트 문서를 만듭니다. content는 생략하면 빈 문서로 시작합니다 (일반 텍스트 또는 HTML -- 체크박스 목록은 웹 UI의 위지위그 에디터와 동일한 형식).",
-      inputSchema: { title: z.string(), folder: z.string().optional(), content: z.string().optional() },
+      description:
+        "새 체크리스트 문서를 만듭니다. content는 생략하면 빈 문서로 시작합니다 (일반 텍스트 또는 HTML -- 체크박스 목록은 웹 UI의 위지위그 에디터와 동일한 형식). 자연어 요청은 할일/체크리스트/위키 중 어디에 넣을지 애매한 경우가 많으므로," +
+        CONFIRM_NOTE,
+      inputSchema: { title: z.string(), folder: z.string().optional(), content: z.string().optional(), ...CONFIRM_FIELD },
     },
     async (args) => {
+      if (args.confirm !== true) {
+        return ok({
+          preview: true,
+          message: `아직 생성되지 않았습니다. 다음 내용으로 체크리스트를 생성하려 합니다: "${args.title}"${args.folder ? ` (폴더: ${args.folder})` : ""}. 사용자에게 먼저 알리고 확인받은 후 confirm:true로 다시 호출하세요.`,
+        });
+      }
       const checklist = await prisma.checklist.create({ data: { title: args.title, folder: args.folder || "", content: args.content || "", ownerId: user.id } });
       return ok(checklist);
     }
@@ -210,10 +283,19 @@ export function buildMcpServer(user: CurrentUser): McpServer {
     return ok(checklist);
   });
 
-  server.registerTool("delete_checklist", { title: "체크리스트 삭제", description: "체크리스트 문서를 삭제합니다.", inputSchema: { id: z.string() } }, async ({ id }) => {
-    await prisma.checklist.delete({ where: { id } });
-    return ok({ deleted: id });
-  });
+  server.registerTool(
+    "delete_checklist",
+    { title: "체크리스트 삭제", description: "체크리스트 문서를 삭제합니다 (되돌릴 수 없음)." + CONFIRM_NOTE, inputSchema: { id: z.string(), ...CONFIRM_FIELD } },
+    async ({ id, confirm }) => {
+      const checklist = await prisma.checklist.findUnique({ where: { id } });
+      if (!checklist) return err("체크리스트를 찾을 수 없습니다.");
+      if (confirm !== true) {
+        return ok({ preview: true, message: `"${checklist.title}" 체크리스트를 삭제하려 합니다. 되돌릴 수 없습니다. 사용자에게 먼저 알리고 확인받은 후 confirm:true로 다시 호출하세요.` });
+      }
+      await prisma.checklist.delete({ where: { id } });
+      return ok({ deleted: id });
+    }
+  );
 
   // ---------- files ----------
   server.registerTool("list_files", { title: "파일 목록", description: "SYNC_FOLDER_PATH 내 폴더 내용을 나열합니다.", inputSchema: { dir: z.string().optional() } }, async ({ dir }) => {
@@ -243,15 +325,22 @@ export function buildMcpServer(user: CurrentUser): McpServer {
     }
   });
 
-  server.registerTool("delete_file", { title: "파일/폴더 삭제", description: "파일 또는 폴더를 삭제합니다.", inputSchema: { path: z.string() } }, async ({ path: relPath }) => {
-    try {
-      await deleteEntry(relPath);
-      await writeAudit(user, "file.delete", relPath, { via: "mcp" });
-      return ok({ deleted: relPath });
-    } catch (e) {
-      return err(e instanceof UnsafePathError ? e.message : "삭제할 수 없습니다.");
+  server.registerTool(
+    "delete_file",
+    { title: "파일/폴더 삭제", description: "파일 또는 폴더를 삭제합니다 (되돌릴 수 없음)." + CONFIRM_NOTE, inputSchema: { path: z.string(), ...CONFIRM_FIELD } },
+    async ({ path: relPath, confirm }) => {
+      if (confirm !== true) {
+        return ok({ preview: true, message: `"${relPath}"을(를) 삭제하려 합니다. 폴더라면 내용물도 함께 삭제되고, 되돌릴 수 없습니다. 사용자에게 먼저 알리고 확인받은 후 confirm:true로 다시 호출하세요.` });
+      }
+      try {
+        await deleteEntry(relPath);
+        await writeAudit(user, "file.delete", relPath, { via: "mcp" });
+        return ok({ deleted: relPath });
+      } catch (e) {
+        return err(e instanceof UnsafePathError ? e.message : "삭제할 수 없습니다.");
+      }
     }
-  });
+  );
 
   server.registerTool("rename_file", { title: "파일 이름변경/이동", description: "파일 또는 폴더 이름을 바꾸거나 이동합니다.", inputSchema: { from: z.string(), to: z.string() } }, async ({ from, to }) => {
     try {
@@ -300,14 +389,27 @@ export function buildMcpServer(user: CurrentUser): McpServer {
     return ok(scripts);
   });
 
-  server.registerTool("run_script", { title: "스크립트 실행", description: "화이트리스트 스크립트를 실행합니다.", inputSchema: { id: z.string() } }, async ({ id }) => {
-    try {
-      const result = await executeScript(id, "manual", user.id);
-      return ok(result);
-    } catch (e) {
-      return err(e instanceof ScriptRunError ? e.message : "스크립트를 실행할 수 없습니다.");
+  server.registerTool(
+    "run_script",
+    {
+      title: "스크립트 실행",
+      description: "화이트리스트 스크립트를 실행합니다. 자연어 요청만으로 어떤 스크립트를 돌릴지 잘못 판단하면 되돌리기 어려운 부작용이 있을 수 있으므로," + CONFIRM_NOTE,
+      inputSchema: { id: z.string(), ...CONFIRM_FIELD },
+    },
+    async ({ id, confirm }) => {
+      const script = await prisma.scriptDef.findUnique({ where: { id } });
+      if (!script) return err("스크립트를 찾을 수 없습니다.");
+      if (confirm !== true) {
+        return ok({ preview: true, message: `스크립트 "${script.file}"(${script.description})를 실행하려 합니다. 사용자에게 먼저 알리고 확인받은 후 confirm:true로 다시 호출하세요.` });
+      }
+      try {
+        const result = await executeScript(id, "manual", user.id);
+        return ok(result);
+      } catch (e) {
+        return err(e instanceof ScriptRunError ? e.message : "스크립트를 실행할 수 없습니다.");
+      }
     }
-  });
+  );
 
   server.registerTool("get_run_logs", { title: "실행 로그 조회", description: "최근 스크립트 실행 로그를 조회합니다.", inputSchema: { scriptId: z.string().optional(), limit: z.number().max(50).optional() } }, async ({ scriptId, limit }) => {
     const runs = await prisma.scriptRun.findMany({
@@ -362,10 +464,19 @@ export function buildMcpServer(user: CurrentUser): McpServer {
     }
   );
 
-  server.registerTool("delete_favorite", { title: "즐겨찾기 삭제", description: "즐겨찾기를 삭제합니다.", inputSchema: { id: z.string() } }, async ({ id }) => {
-    await prisma.favorite.delete({ where: { id } });
-    return ok({ deleted: id });
-  });
+  server.registerTool(
+    "delete_favorite",
+    { title: "즐겨찾기 삭제", description: "즐겨찾기를 삭제합니다 (되돌릴 수 없음)." + CONFIRM_NOTE, inputSchema: { id: z.string(), ...CONFIRM_FIELD } },
+    async ({ id, confirm }) => {
+      const favorite = await prisma.favorite.findUnique({ where: { id } });
+      if (!favorite) return err("즐겨찾기를 찾을 수 없습니다.");
+      if (confirm !== true) {
+        return ok({ preview: true, message: `즐겨찾기 "${favorite.title}"을(를) 삭제하려 합니다. 사용자에게 먼저 알리고 확인받은 후 confirm:true로 다시 호출하세요.` });
+      }
+      await prisma.favorite.delete({ where: { id } });
+      return ok({ deleted: id });
+    }
+  );
 
   // ---------- audit log ----------
   server.registerTool("list_audit_log", { title: "감사 로그 조회", description: "계정·스크립트·파일 변경 이력을 조회합니다.", inputSchema: { limit: z.number().max(200).optional() } }, async ({ limit }) => {
