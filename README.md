@@ -118,7 +118,7 @@ claude.ai 웹/모바일 앱은 클라이언트에 직접 헤더를 넣는 방식
    토큰이 폐기되므로, 별도 해제 없이도 claude.ai가 더 이상 갱신을 시도하지 않으면 자연히 만료됩니다).
 5. `MCP_OAUTH_SECRET` 환경변수가 필요합니다(`SESSION_SECRET`과 동일하게 `openssl rand -base64 32`로 생성 — 용도가 다른 토큰이라 시크릿도 분리).
 
-### 제공 도구 (30개)
+### 제공 도구 (35개)
 
 | 분류 | 도구 | 설명 |
 |---|---|---|
@@ -132,6 +132,11 @@ claude.ai 웹/모바일 앱은 클라이언트에 직접 헤더를 넣는 방식
 | | `create_note` | 문서 생성 (`format`: `md` 또는 `html`) |
 | | `update_note` | 문서 내용 수정 |
 | | `delete_note` | 문서 삭제 |
+| 체크리스트 | `list_checklists` | 체크리스트 목록 조회 (폴더로 필터) |
+| | `get_checklist` | 체크리스트 전체 내용 조회 |
+| | `create_checklist` | 체크리스트 생성 |
+| | `update_checklist` | 체크리스트 내용 수정 (전체 content 교체) |
+| | `delete_checklist` | 체크리스트 삭제 |
 | 파일 | `list_files` | `SYNC_FOLDER_PATH` 폴더 내용 나열 |
 | | `read_file` | 텍스트 파일 읽기 (최대 200KB, 바이너리 미지원) |
 | | `write_file` | 텍스트 파일 생성/덮어쓰기 |
