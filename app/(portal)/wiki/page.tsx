@@ -23,7 +23,12 @@ export default async function WikiPage({ searchParams }: { searchParams: Promise
 
       <section style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 10, overflow: "hidden" }}>
         {selected ? (
+          // key={selected.id} forces a remount when switching notes -- without it, WikiEditor's
+          // internal `source`/`mode` state (initialized once from props) stays stuck on
+          // whichever note was loaded first instead of following the selection (same bug as
+          // ChecklistDoc, fixed there first after it was reported for /checklists).
           <WikiEditor
+            key={selected.id}
             noteId={selected.id}
             path={`${selected.folder ? selected.folder + " / " : ""}${selected.title}.${selected.format}`}
             title={selected.title}
