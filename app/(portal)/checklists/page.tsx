@@ -21,7 +21,11 @@ export default async function ChecklistsPage({ searchParams }: { searchParams: P
 
       <section style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 10, overflow: "hidden" }}>
         {selected ? (
+          // key={selected.id} forces a remount when switching checklists -- without it,
+          // ChecklistDoc's internal `source`/`mode` state (initialized once from props) stays
+          // stuck on whichever checklist was loaded first instead of following the selection.
           <ChecklistDoc
+            key={selected.id}
             checklistId={selected.id}
             path={`${selected.folder ? selected.folder + " / " : ""}${selected.title}`}
             title={selected.title}
