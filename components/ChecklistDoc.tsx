@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { saveChecklistAction, deleteChecklistAction, toggleChecklistItemAction } from "@/app/actions/checklists";
+import { saveChecklistAction, deleteChecklistAction, toggleChecklistItemAction, resetChecklistAction } from "@/app/actions/checklists";
 import { WikiHtmlEditor } from "./WikiHtmlEditor";
 
 interface Props {
@@ -38,6 +38,7 @@ export function ChecklistDoc({ checklistId, path, title, content, html, updatedA
   const [pending, startTransition] = useTransition();
   const [checkPending, startCheckTransition] = useTransition();
   const [deleting, startDelete] = useTransition();
+  const [resetting, startReset] = useTransition();
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [viewBg, viewFg] = seg(mode === "view");
   const [editBg, editFg] = seg(mode === "edit");
@@ -53,6 +54,11 @@ export function ChecklistDoc({ checklistId, path, title, content, html, updatedA
   const remove = () => {
     if (!confirm(`"${title}" 체크리스트를 삭제할까요? 되돌릴 수 없습니다.`)) return;
     startDelete(() => deleteChecklistAction(checklistId));
+  };
+
+  const reset = () => {
+    if (!confirm(`"${title}"의 체크를 모두 초기화할까요? 항목은 그대로 남고 체크 표시만 지워집니다.`)) return;
+    startReset(() => resetChecklistAction(checklistId));
   };
 
   return (
@@ -86,6 +92,16 @@ export function ChecklistDoc({ checklistId, path, title, content, html, updatedA
                   style={{ height: 26, padding: "0 12px", border: 0, borderRadius: 6, background: "var(--accent)", color: "var(--on-accent)", fontSize: 12, fontWeight: 600, cursor: pending ? "default" : "pointer", opacity: pending ? 0.6 : 1 }}
                 >
                   저장
+                </button>
+              )}
+              {mode === "view" && (
+                <button
+                  onClick={reset}
+                  disabled={resetting}
+                  title="모든 체크 해제 (항목은 유지)"
+                  style={{ height: 26, padding: "0 10px", border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel)", color: "var(--ink2)", fontSize: 11.5, cursor: resetting ? "default" : "pointer" }}
+                >
+                  {resetting ? "초기화 중..." : "체크 초기화"}
                 </button>
               )}
               <button

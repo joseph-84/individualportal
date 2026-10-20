@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requirePerm } from "@/lib/guard";
 import { writeAudit } from "@/lib/audit";
-import { toggleTaskItemChecked } from "@/lib/rich-text";
+import { toggleTaskItemChecked, resetAllTaskItemsChecked } from "@/lib/rich-text";
 
 export async function saveChecklistAction(id: string, content: string) {
   await requirePerm("checklists", 2);
@@ -49,6 +49,18 @@ export async function toggleChecklistItemAction(id: string, checkboxIndex: numbe
   const updated = toggleTaskItemChecked(checklist.content, checkboxIndex);
   if (updated === checklist.content) return;
   await prisma.checklist.update({ where: { id }, data: { content: updated } });
+  revalidatePath("/checklists");
+}
+
+/** Unchecks every item at once -- for a recurring checklist (shopping list, routine) you want
+ * to reuse without manually unchecking each box or retyping the whole thing. */
+export async function resetChecklistAction(id: string) {
+  const user = await requirePerm("checklists", 2);
+  const checklist = await prisma.checklist.findUniqueOrThrow({ where: { id } });
+  const updated = resetAllTaskItemsChecked(checklist.content);
+  if (updated === checklist.content) return;
+  await prisma.checklist.update({ where: { id }, data: { content: updated } });
+  await writeAudit(user, "checklist.reset", checklist.title);
   revalidatePath("/checklists");
 }
 
