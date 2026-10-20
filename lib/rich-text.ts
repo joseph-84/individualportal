@@ -46,3 +46,16 @@ export function toggleTaskItemChecked(html: string, index: number): string {
 
   return html.slice(0, liOpenStart) + newLiOpen + html.slice(liOpenEnd, inputAbsStart) + newInput + html.slice(inputAbsEnd);
 }
+
+/** Unchecks every task-item checkbox in Tiptap-produced HTML (same two places as
+ * toggleTaskItemChecked: the <li data-checked="..."> attribute and the <input ... checked>
+ * attribute) -- used by the checklist "체크 초기화" button to reset a recurring checklist
+ * (e.g. a shopping list) back to all-unchecked without deleting/re-typing the items. */
+export function resetAllTaskItemsChecked(html: string): string {
+  return html
+    .replace(/data-checked="true"/g, 'data-checked="false"')
+    .replace(/<input\b([^>]*)type="checkbox"([^>]*)>/g, (_match, pre: string, post: string) => {
+      const strip = (attrs: string) => attrs.replace(/\s+checked(="[^"]*")?/g, "");
+      return `<input${strip(pre)}type="checkbox"${strip(post)}>`;
+    });
+}
