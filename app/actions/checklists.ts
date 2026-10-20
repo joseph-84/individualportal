@@ -51,3 +51,13 @@ export async function toggleChecklistItemAction(id: string, checkboxIndex: numbe
   await prisma.checklist.update({ where: { id }, data: { content: updated } });
   revalidatePath("/checklists");
 }
+
+/** Moves a checklist to a different folder path (drag-and-drop between existing folders/root,
+ * or the sidebar's inline "폴더 이동" input for a brand-new path). `folder` is a plain string
+ * that the sidebar treats as a "/"-delimited tree path client-side -- no schema change, same
+ * virtual-folder convention as Note/Favorite (a folder only "exists" while something is in it). */
+export async function moveChecklistAction(id: string, folder: string) {
+  await requirePerm("checklists", 2);
+  await prisma.checklist.update({ where: { id }, data: { folder } });
+  revalidatePath("/checklists");
+}
