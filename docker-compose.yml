@@ -7,7 +7,11 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-portal}
       POSTGRES_DB: ${POSTGRES_DB:-portal}
     volumes:
-      - portal_pgdata:/var/lib/postgresql/data
+      # Same override pattern as HOST_SYNC_FOLDER/HOST_SCRIPTS_FOLDER below -- set HOST_PGDATA
+      # in .env to bind-mount a host path instead of the default named volume (e.g. to keep DB
+      # data under a managed /data/docker/<app>/ layout instead of Docker's internal volume
+      # storage, where it's easy to lose if the deploy source checkout is ever wiped/re-cloned).
+      - ${HOST_PGDATA:-portal_pgdata}:/var/lib/postgresql/data
     ports:
       - "127.0.0.1:5433:5432"
     healthcheck:
