@@ -37,6 +37,7 @@ services:
       HOSTNAME: "0.0.0.0"
       DATABASE_URL: postgresql://${POSTGRES_USER:-portal}:${POSTGRES_PASSWORD:-portal}@db:5432/${POSTGRES_DB:-portal}
       SESSION_SECRET: ${SESSION_SECRET}
+      MCP_OAUTH_SECRET: ${MCP_OAUTH_SECRET}
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       SYNC_FOLDER_PATH: /data/mount
