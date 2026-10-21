@@ -10,6 +10,7 @@ import { executeScript, ScriptRunError } from "@/lib/run-script";
 import { generateShareToken } from "@/lib/share";
 import { writeAudit } from "@/lib/audit";
 import { nextCompletedAt, cascadeParentCompletion } from "@/lib/todo-status";
+import { normalizeUrl, nextFavoriteOrder } from "@/lib/favorites";
 
 function ok(data: unknown): CallToolResult {
   return { content: [{ type: "text", text: typeof data === "string" ? data : JSON.stringify(data, null, 2) }] };
@@ -450,7 +451,9 @@ export function buildMcpServer(user: CurrentUser): McpServer {
     "create_favorite",
     { title: "즐겨찾기 추가", description: "새 즐겨찾기를 추가합니다.", inputSchema: { title: z.string(), url: z.string(), folder: z.string().optional() } },
     async (args) => {
-      const favorite = await prisma.favorite.create({ data: { title: args.title, url: args.url, folder: args.folder || "", ownerId: user.id } });
+      const folder = args.folder || "";
+      const order = await nextFavoriteOrder(folder);
+      const favorite = await prisma.favorite.create({ data: { title: args.title, url: normalizeUrl(args.url), folder, order, ownerId: user.id } });
       return ok(favorite);
     }
   );

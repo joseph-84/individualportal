@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Portal 즐겨찾기 추가",
+  "version": "1.0.0",
+  "description": "개인 포털(individualPortal)의 즐겨찾기에 현재 탭을 추가합니다.",
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "options_page": "options.html",
+  "permissions": ["storage", "activeTab"],
+  "host_permissions": ["<all_urls>"]
+}

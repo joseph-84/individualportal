@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>즐겨찾기 추가</title>
+    <style>
+      body {
+        font-family: system-ui, "Segoe UI", sans-serif;
+        width: 320px;
+        margin: 0;
+        padding: 16px;
+        color: #1b1a18;
+        background: #fff;
+      }
+      h1 {
+        font-size: 13.5px;
+        margin: 0 0 12px;
+      }
+      label {
+        display: block;
+        font-size: 11.5px;
+        font-weight: 600;
+        color: #57534d;
+        margin-bottom: 5px;
+      }
+      input {
+        width: 100%;
+        height: 30px;
+        padding: 0 9px;
+        margin-bottom: 12px;
+        border: 1px solid #e4e0da;
+        border-radius: 6px;
+        font-size: 12.5px;
+        box-sizing: border-box;
+      }
+      button {
+        width: 100%;
+        height: 32px;
+        border: 0;
+        border-radius: 6px;
+        background: #b0512e;
+        color: #fff;
+        font-size: 12.5px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.6;
+        cursor: default;
+      }
+      #message {
+        margin-top: 10px;
+        font-size: 12px;
+      }
+      #setupNotice {
+        display: none;
+        font-size: 12.5px;
+        color: #57534d;
+        line-height: 1.6;
+      }
+      #setupNotice button {
+        margin-top: 10px;
+      }
+      #form {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>⭐ Portal에 즐겨찾기 추가</h1>
+
+    <div id="setupNotice">
+      아직 포털 URL/토큰이 설정되지 않았습니다. 옵션 페이지에서 먼저 설정하세요.
+      <button id="openOptions" type="button">설정 열기</button>
+    </div>
+
+    <form id="form">
+      <label for="title">제목</label>
+      <input id="title" required />
+      <label for="url">URL</label>
+      <input id="url" required />
+      <label for="folder">폴더 (비우면 미분류/루트)</label>
+      <input id="folder" list="folders" placeholder="예: 업무 도구" />
+      <datalist id="folders"></datalist>
+      <button id="save" type="submit">저장</button>
+      <div id="message"></div>
+    </form>
+
+    <script src="popup.js" type="module"></script>
+  </body>
+</html>
