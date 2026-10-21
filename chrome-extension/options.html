@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>Portal 즐겨찾기 추가 — 설정</title>
+    <style>
+      body {
+        font-family: system-ui, "Segoe UI", sans-serif;
+        width: 360px;
+        margin: 0;
+        padding: 20px;
+        color: #1b1a18;
+        background: #f5f4f1;
+      }
+      h1 {
+        font-size: 15px;
+        margin: 0 0 4px;
+      }
+      p.hint {
+        font-size: 12px;
+        color: #8e8881;
+        margin: 0 0 16px;
+        line-height: 1.5;
+      }
+      label {
+        display: block;
+        font-size: 12px;
+        font-weight: 600;
+        color: #57534d;
+        margin-bottom: 6px;
+      }
+      input {
+        width: 100%;
+        height: 32px;
+        padding: 0 10px;
+        margin-bottom: 14px;
+        border: 1px solid #e4e0da;
+        border-radius: 6px;
+        font-size: 13px;
+        box-sizing: border-box;
+      }
+      button {
+        height: 32px;
+        padding: 0 14px;
+        border: 0;
+        border-radius: 6px;
+        background: #b0512e;
+        color: #fff;
+        font-size: 12.5px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      #status {
+        margin-top: 10px;
+        font-size: 12px;
+        color: #2f7350;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Portal 즐겨찾기 추가 설정</h1>
+    <p class="hint">
+      포털의 <strong>/account</strong> 페이지 → API 토큰 섹션에서 토큰을 발급한 뒤 아래에
+      입력하세요. 토큰은 발급 시 한 번만 표시되니 바로 복사해두세요.
+    </p>
+    <label for="portalUrl">포털 URL</label>
+    <input id="portalUrl" type="url" placeholder="https://portal.example.com" />
+    <label for="token">API 토큰</label>
+    <input id="token" type="password" placeholder="portal_..." autocomplete="off" />
+    <button id="save">저장</button>
+    <div id="status"></div>
+    <script src="options.js" type="module"></script>
+  </body>
+</html>

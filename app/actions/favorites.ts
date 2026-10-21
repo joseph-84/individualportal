@@ -4,17 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requirePerm } from "@/lib/guard";
 import { writeAudit } from "@/lib/audit";
-
-function normalizeUrl(raw: string): string {
-  const url = raw.trim();
-  if (/^[a-z][a-z0-9+.-]*:/i.test(url) || url.startsWith("/")) return url;
-  return `https://${url}`;
-}
-
-async function nextOrder(folder: string): Promise<number> {
-  const last = await prisma.favorite.findFirst({ where: { folder }, orderBy: { order: "desc" } });
-  return (last?.order ?? 0) + 1000;
-}
+import { normalizeUrl, nextFavoriteOrder } from "@/lib/favorites";
 
 export interface FavoriteFormState {
   error?: string;
@@ -28,7 +18,7 @@ export async function createFavoriteAction(_prev: FavoriteFormState, formData: F
   if (!title) return { error: "제목을 입력하세요." };
   if (!urlRaw) return { error: "URL을 입력하세요." };
 
-  const order = await nextOrder(folder);
+  const order = await nextFavoriteOrder(folder);
   const favorite = await prisma.favorite.create({ data: { title, url: normalizeUrl(urlRaw), folder, order, ownerId: user.id } });
   await writeAudit(user, "favorite.create", title, { folder });
   revalidatePath("/favorites");
