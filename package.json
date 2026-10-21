@@ -25,6 +25,8 @@
     "@tiptap/pm": "^3.31.3",
     "@tiptap/react": "^3.31.3",
     "@tiptap/starter-kit": "^3.31.3",
+    "@types/adm-zip": "^0.5.8",
+    "adm-zip": "^0.6.1",
     "bcryptjs": "^3.0.2",
     "jose": "^6.0.10",
     "marked": "^18.0.12",

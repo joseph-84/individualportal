@@ -165,6 +165,38 @@ function ApiTokenSection({ mcpUrl }: { mcpUrl: string }) {
   );
 }
 
+function ExtensionDownloadSection() {
+  return (
+    <section style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 10, padding: "16px 18px" }}>
+      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>즐겨찾기 추가 크롬 익스텐션</div>
+      <div style={{ fontSize: 12, color: "var(--ink3)", marginBottom: 12 }}>
+        지금 보고 있는 탭을 바로 즐겨찾기에 추가하는 개인용 크롬 익스텐션입니다. 위 API 토큰과 함께 씁니다 — 다운로드 후 압축을 풀고{" "}
+        <code style={{ fontFamily: "var(--font-mono), monospace", background: "var(--panel3)", padding: "1px 5px", borderRadius: 4 }}>chrome://extensions</code>
+        에서 개발자 모드 → 압축해제된 확장 프로그램 로드로 그 폴더를 선택하세요. 그다음 익스텐션 옵션 화면에 포털 URL과 위에서 발급한 토큰을 입력하면 됩니다.
+      </div>
+      <a
+        href="/api/extension-download"
+        download
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          height: 32,
+          padding: "0 14px",
+          border: 0,
+          borderRadius: 7,
+          background: "var(--accent)",
+          color: "var(--on-accent)",
+          fontSize: 12.5,
+          fontWeight: 600,
+          textDecoration: "none",
+        }}
+      >
+        다운로드 (.zip)
+      </a>
+    </section>
+  );
+}
+
 export function AccountClient({ name, email, mcpUrl }: { name: string; email: string; mcpUrl: string }) {
   return (
     <div style={{ display: "grid", gap: 12, maxWidth: 560 }}>
@@ -177,6 +209,7 @@ export function AccountClient({ name, email, mcpUrl }: { name: string; email: st
       <PasswordSection />
       <SessionSection />
       <ApiTokenSection mcpUrl={mcpUrl} />
+      <ExtensionDownloadSection />
     </div>
   );
 }

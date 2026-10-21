@@ -23,6 +23,10 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
+# Not part of Next's own module graph (nothing imports it), so standalone tracing never picks
+# it up on its own -- app/api/extension-download/route.ts reads it straight off disk at
+# request time to zip it for the /account download button.
+COPY --from=builder /app/chrome-extension ./chrome-extension
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 # Next bundles app deps into its own compiled output for the server runtime, but the
