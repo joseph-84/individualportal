@@ -71,7 +71,11 @@ async function main() {
     });
   }
 
-  console.log(`Seed complete. Admin login: ${adminEmail} / ${adminPassword}`);
+  // Never log adminPassword -- this seed runs on every container start (docker-entrypoint.sh),
+  // so printing it would put the real production admin password in plaintext in the container
+  // logs on every boot. The email alone is enough to confirm which account was seeded; the
+  // operator already has the password in their own .env (ADMIN_PASSWORD), it's never generated.
+  console.log(`Seed complete. Admin login email: ${adminEmail}`);
 }
 
 main()
