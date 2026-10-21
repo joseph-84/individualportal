@@ -5,6 +5,7 @@ import { readFileBuffer, UnsafePathError } from "@/lib/files";
 import { isKbPath, resolveKbNote } from "@/lib/kb-files";
 import { renderNote, renderShareDocument } from "@/lib/markdown";
 import { shareAccessCookieName, verifyShareAccessToken } from "@/lib/share-otp-auth";
+import { externalOrigin } from "@/lib/origin";
 
 const MIME: Record<string, string> = {
   PNG: "image/png",
@@ -32,7 +33,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
     const cookieVal = req.cookies.get(shareAccessCookieName(token))?.value;
     const okAccess = cookieVal ? await verifyShareAccessToken(cookieVal, token) : false;
     if (!okAccess) {
-      return NextResponse.redirect(new URL(`/share/${token}`, req.url));
+      return NextResponse.redirect(new URL(`/share/${token}`, externalOrigin(req.headers)));
     }
   }
 
