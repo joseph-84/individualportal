@@ -136,8 +136,8 @@ export default async function DashboardPage() {
           <section style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 10, overflow: "hidden" }}>
             <div style={{ display: "flex", alignItems: "center", padding: "12px 15px", borderBottom: "1px solid var(--line2)" }}>
               <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap" }}>최근 노트</div>
-              <Link href="/wiki" style={{ marginLeft: "auto", fontSize: 12 }}>
-                위키
+              <Link href="/files" style={{ marginLeft: "auto", fontSize: 12 }}>
+                파일
               </Link>
             </div>
             {notes.length === 0 && <div style={{ padding: "20px 15px", fontSize: 12.5, color: "var(--ink3)" }}>등록된 노트가 없습니다.</div>}

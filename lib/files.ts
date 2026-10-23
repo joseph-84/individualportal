@@ -22,6 +22,9 @@ export interface FileEntry {
   size: number;
   mtime: string;
   ext: string;
+  /** Only set for a __kb__ (knowledge-base note) entry -- see lib/kb-files.ts. Lets the unified
+   * file browser's tree filter match a note by tag the same way it matches a name. */
+  tags?: string[];
 }
 
 export async function listDir(relPath: string): Promise<FileEntry[]> {
