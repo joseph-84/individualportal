@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { searchAction, type SearchResult } from "@/app/actions/search";
 
-const KIND_LABEL: Record<string, string> = { todo: "할일", note: "지식베이스", file: "파일" };
+const KIND_LABEL: Record<string, string> = { todo: "할일", file: "파일" };
 
 export function HeaderSearch() {
   const router = useRouter();

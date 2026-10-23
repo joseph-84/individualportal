@@ -2,24 +2,17 @@ import { NextResponse, type NextRequest } from "next/server";
 import path from "node:path";
 import { apiRequirePerm } from "@/lib/guard";
 import { readFileBuffer, UnsafePathError } from "@/lib/files";
-import { isKbPath, resolveKbNote } from "@/lib/kb-files";
 import { renderNote } from "@/lib/markdown";
 
-/** Renders a .md/.html file (or KB note) to sanitized viewer HTML — the same rendering the
- * wiki editor's 뷰어 mode uses — so the file browser preview shows a readable document
- * instead of raw source. */
+/** Renders a .md/.html file to sanitized viewer HTML — the same rendering the document
+ * editor's 뷰어 mode uses — so the file browser preview shows a readable document instead
+ * of raw source. */
 export async function GET(req: NextRequest) {
   const auth = await apiRequirePerm("files", 1);
   if ("error" in auth) return auth.error;
 
   const relPath = req.nextUrl.searchParams.get("path");
   if (!relPath) return NextResponse.json({ error: "path 파라미터가 필요합니다." }, { status: 400 });
-
-  if (isKbPath(relPath)) {
-    const note = await resolveKbNote(relPath);
-    if (!note) return NextResponse.json({ error: "문서를 찾을 수 없습니다." }, { status: 404 });
-    return NextResponse.json({ title: note.title, html: renderNote(note.content, note.format) });
-  }
 
   const ext = path.extname(relPath).replace(".", "").toUpperCase();
   if (ext !== "MD" && ext !== "HTML") {

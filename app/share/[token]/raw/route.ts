@@ -2,7 +2,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import path from "node:path";
 import { prisma } from "@/lib/prisma";
 import { readFileBuffer, UnsafePathError } from "@/lib/files";
-import { isKbPath, resolveKbNote } from "@/lib/kb-files";
 import { renderNote, renderShareDocument } from "@/lib/markdown";
 import { shareAccessCookieName, verifyShareAccessToken } from "@/lib/share-otp-auth";
 import { externalOrigin } from "@/lib/origin";
@@ -39,29 +38,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
 
   const download = req.nextUrl.searchParams.get("download") === "1";
 
-  if (isKbPath(link.relPath)) {
-    const note = await resolveKbNote(link.relPath);
-    if (!note) return new NextResponse("문서를 찾을 수 없습니다.", { status: 404 });
-    prisma.shareLink.update({ where: { id: link.id }, data: { lastAccessedAt: new Date() } }).catch(() => {});
-
-    const filename = `${note.title}.${note.format}`;
-    if (download) {
-      return new NextResponse(note.content, {
-        headers: {
-          "Content-Type": "application/octet-stream",
-          "Content-Disposition": `attachment; filename="${encodeURIComponent(filename)}"`,
-        },
-      });
-    }
-    // Inline (non-download) rendering is shown to external, non-owner viewers, so it's
-    // sanitized first — unlike the internal wiki viewer/file browser, which trust the single
-    // account that authors and reads every note. Downloading still returns the true original
-    // file. Both formats render to a full standalone document (see renderShareDocument) since
-    // this is loaded into a sandboxed <iframe> with no access to the app's own stylesheet.
-    const body = renderNote(note.content, note.format);
-    return new NextResponse(renderShareDocument(note.title, body), { headers: { "Content-Type": "text/html; charset=utf-8" } });
-  }
-
   try {
     const buf = await readFileBuffer(link.relPath);
     prisma.shareLink.update({ where: { id: link.id }, data: { lastAccessedAt: new Date() } }).catch(() => {});
@@ -77,8 +53,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
         },
       });
     }
-    // Render + sanitize inline HTML/markdown for the same reason as the KB branch above —
-    // this is shown to external, non-owner viewers.
+    // Render + sanitize inline HTML/markdown since this is shown to external, non-owner viewers.
     if (ext === "HTML" || ext === "MD") {
       const body = renderNote(buf.toString("utf-8"), ext === "HTML" ? "html" : "md");
       const title = path.basename(link.relPath, path.extname(link.relPath));

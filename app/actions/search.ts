@@ -3,10 +3,9 @@
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/guard";
 import { listDir } from "@/lib/files";
-import { kbPathFor } from "@/lib/kb-files";
 
 export interface SearchResult {
-  kind: "todo" | "note" | "file";
+  kind: "todo" | "file";
   id: string;
   title: string;
   subtitle: string;
@@ -25,12 +24,6 @@ export async function searchAction(query: string): Promise<SearchResult[]> {
     take: 5,
   });
   for (const t of todos) results.push({ kind: "todo", id: t.id, title: t.title, subtitle: t.project || "할일", href: "/todos" });
-
-  const notes = await prisma.note.findMany({
-    where: { OR: [{ title: { contains: q, mode: "insensitive" } }, { content: { contains: q, mode: "insensitive" } }] },
-    take: 5,
-  });
-  for (const n of notes) results.push({ kind: "note", id: n.id, title: n.title, subtitle: n.folder || "지식베이스", href: `/files?path=${encodeURIComponent(kbPathFor(n))}` });
 
   try {
     const walk = async (dir: string, depth: number): Promise<void> => {
