@@ -19,10 +19,9 @@ const OP_COLOR: [string, string] = ["var(--accent-soft)", "var(--accent)"];
 export default async function DashboardPage() {
   const { user, level } = await pageAccess("dashboard");
 
-  const [todos, incompleteCount, notes, runs, weekRuns, errRuns, files] = await Promise.all([
+  const [todos, incompleteCount, runs, weekRuns, errRuns, files] = await Promise.all([
     prisma.todo.findMany({ where: { parentId: null }, orderBy: { order: "asc" }, take: 5 }),
     prisma.todo.count({ where: { status: { not: "done" } } }),
-    prisma.note.findMany({ orderBy: { updatedAt: "desc" }, take: 4 }),
     prisma.scriptRun.findMany({ orderBy: { startedAt: "desc" }, take: 5, include: { script: true } }),
     prisma.scriptRun.count({ where: { startedAt: { gte: new Date(Date.now() - 7 * 86400000) } } }),
     prisma.scriptRun.findFirst({ where: { status: "err" }, orderBy: { startedAt: "desc" }, include: { script: true } }),
@@ -35,7 +34,6 @@ export default async function DashboardPage() {
     { label: "미완료 할일", value: String(incompleteCount), kind: "err" as const },
     { label: "이번 주 자동 실행", value: String(weekRuns), kind: "ok" as const },
     { label: "최근 실패", value: errRuns ? errRuns.script.file : "없음", kind: "warn" as const },
-    { label: "등록된 노트", value: String(notes.length), kind: "dim" as const },
   ];
   const KPI_COLOR = { err: "var(--err)", ok: "var(--ok)", warn: "var(--warn)", dim: "var(--ink3)" };
 
@@ -132,59 +130,40 @@ export default async function DashboardPage() {
           ))}
         </section>
 
-        <div style={{ display: "grid", gap: 12 }}>
-          <section style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 10, overflow: "hidden" }}>
-            <div style={{ display: "flex", alignItems: "center", padding: "12px 15px", borderBottom: "1px solid var(--line2)" }}>
-              <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap" }}>최근 노트</div>
-              <Link href="/files" style={{ marginLeft: "auto", fontSize: 12 }}>
-                파일
-              </Link>
-            </div>
-            {notes.length === 0 && <div style={{ padding: "20px 15px", fontSize: 12.5, color: "var(--ink3)" }}>등록된 노트가 없습니다.</div>}
-            {notes.map((n) => (
-              <div key={n.id} style={{ padding: "9px 15px", borderBottom: "1px solid var(--line2)" }}>
-                <div style={{ fontSize: 12.5, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{n.title}</div>
-                <div style={{ fontSize: 11, color: "var(--ink3)", marginTop: 2 }}>
-                  {n.folder} · {new Date(n.updatedAt).toLocaleDateString("ko-KR")}
-                </div>
+        <section style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 10, overflow: "hidden" }}>
+          <div style={{ display: "flex", alignItems: "center", padding: "12px 15px", borderBottom: "1px solid var(--line2)" }}>
+            <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap" }}>최근 파일 변경</div>
+            <Link href="/files" style={{ marginLeft: "auto", fontSize: 12 }}>
+              브라우저
+            </Link>
+          </div>
+          {files.length === 0 && <div style={{ padding: "20px 15px", fontSize: 12.5, color: "var(--ink3)" }}>동기화 폴더가 비어 있습니다.</div>}
+          {files.map((f) => {
+            const [bg, fg] = OP_COLOR;
+            return (
+              <div key={f.relPath} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 15px", borderBottom: "1px solid var(--line2)" }}>
+                <span style={{ fontSize: 9.5, fontWeight: 700, width: 32, textAlign: "center", padding: "2px 0", borderRadius: 4, background: bg, color: fg, flex: "none" }}>
+                  {f.ext || "-"}
+                </span>
+                <span
+                  style={{
+                    fontFamily: "var(--font-mono), monospace",
+                    fontSize: 11.5,
+                    flex: 1,
+                    minWidth: 0,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    color: "var(--ink2)",
+                  }}
+                >
+                  {f.relPath}
+                </span>
+                <span style={{ fontSize: 11, color: "var(--ink3)", flex: "none" }}>{new Date(f.mtime).toLocaleDateString("ko-KR")}</span>
               </div>
-            ))}
-          </section>
-          <section style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 10, overflow: "hidden" }}>
-            <div style={{ display: "flex", alignItems: "center", padding: "12px 15px", borderBottom: "1px solid var(--line2)" }}>
-              <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap" }}>최근 파일 변경</div>
-              <Link href="/files" style={{ marginLeft: "auto", fontSize: 12 }}>
-                브라우저
-              </Link>
-            </div>
-            {files.length === 0 && <div style={{ padding: "20px 15px", fontSize: 12.5, color: "var(--ink3)" }}>동기화 폴더가 비어 있습니다.</div>}
-            {files.map((f) => {
-              const [bg, fg] = OP_COLOR;
-              return (
-                <div key={f.relPath} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 15px", borderBottom: "1px solid var(--line2)" }}>
-                  <span style={{ fontSize: 9.5, fontWeight: 700, width: 32, textAlign: "center", padding: "2px 0", borderRadius: 4, background: bg, color: fg, flex: "none" }}>
-                    {f.ext || "-"}
-                  </span>
-                  <span
-                    style={{
-                      fontFamily: "var(--font-mono), monospace",
-                      fontSize: 11.5,
-                      flex: 1,
-                      minWidth: 0,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                      color: "var(--ink2)",
-                    }}
-                  >
-                    {f.relPath}
-                  </span>
-                  <span style={{ fontSize: 11, color: "var(--ink3)", flex: "none" }}>{new Date(f.mtime).toLocaleDateString("ko-KR")}</span>
-                </div>
-              );
-            })}
-          </section>
-        </div>
+            );
+          })}
+        </section>
       </div>
     </>
   );

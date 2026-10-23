@@ -2,7 +2,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import path from "node:path";
 import { apiRequirePerm } from "@/lib/guard";
 import { readFileBuffer, previewKind, UnsafePathError } from "@/lib/files";
-import { isKbPath, resolveKbNote } from "@/lib/kb-files";
 
 const MIME: Record<string, string> = {
   PNG: "image/png",
@@ -36,18 +35,6 @@ export async function GET(req: NextRequest) {
   if (!relPath) return NextResponse.json({ error: "path 파라미터가 필요합니다." }, { status: 400 });
 
   const ext = path.extname(relPath).replace(".", "").toUpperCase();
-
-  if (isKbPath(relPath)) {
-    const note = await resolveKbNote(relPath);
-    if (!note) return NextResponse.json({ error: "문서를 찾을 수 없습니다." }, { status: 404 });
-    const filename = `${note.title}.${note.format}`;
-    return new NextResponse(note.content, {
-      headers: {
-        "Content-Type": download ? "application/octet-stream" : note.format === "html" ? "text/html; charset=utf-8" : "text/markdown; charset=utf-8",
-        ...(download ? { "Content-Disposition": `attachment; filename="${encodeURIComponent(filename)}"` } : {}),
-      },
-    });
-  }
 
   try {
     const buf = await readFileBuffer(relPath);

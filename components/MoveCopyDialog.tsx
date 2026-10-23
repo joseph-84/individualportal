@@ -8,10 +8,6 @@ interface FolderEntry {
   isDir: boolean;
 }
 
-function isKb(p: string) {
-  return p === "__kb__" || p.startsWith("__kb__/");
-}
-
 function seg(on: boolean): [string, string] {
   return on ? ["var(--panel)", "var(--ink)"] : ["transparent", "var(--ink2)"];
 }
@@ -37,7 +33,7 @@ function PickerNode({
   onSelect: (path: string) => void;
   disabledPrefix: string | null;
 }) {
-  const kids = (dirCache[path] || []).filter((e) => e.isDir && !isKb(e.relPath));
+  const kids = (dirCache[path] || []).filter((e) => e.isDir);
   const isExpanded = expanded.has(path);
   const isSelected = selected === path;
   const disabled = disabledPrefix !== null && (path === disabledPrefix || path.startsWith(disabledPrefix + "/"));
@@ -162,7 +158,7 @@ export function MoveCopyDialog({
     }
   };
 
-  const rootFolders = (dirCache[""] || []).filter((e) => e.isDir && !isKb(e.relPath));
+  const rootFolders = (dirCache[""] || []).filter((e) => e.isDir);
   const disabledPrefix = isDir ? relPath : null;
 
   return (

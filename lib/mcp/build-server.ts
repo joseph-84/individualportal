@@ -5,7 +5,6 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { prisma } from "@/lib/prisma";
 import type { CurrentUser } from "@/lib/session";
 import { listDir, readFileBuffer, writeFile as writeFsFile, deleteEntry, renameOrMoveEntry, ensureDir, UnsafePathError } from "@/lib/files";
-import { isKbPath, listKbEntries, kbRootEntry, resolveKbNote, renameOrMoveKbNote } from "@/lib/kb-files";
 import { listScriptFiles, readScriptFile, writeScriptFile } from "@/lib/scripts-fs";
 import { executeScript, ScriptRunError } from "@/lib/run-script";
 import { generateShareToken } from "@/lib/share";
@@ -188,65 +187,6 @@ export function buildMcpServer(user: CurrentUser): McpServer {
     }
   );
 
-  // ---------- wiki ----------
-  server.registerTool("list_notes", { title: "위키 문서 목록", description: "위키 문서 목록을 조회합니다.", inputSchema: { folder: z.string().optional() } }, async ({ folder }) => {
-    const notes = await prisma.note.findMany({ where: folder !== undefined ? { folder } : undefined, orderBy: [{ folder: "asc" }, { title: "asc" }] });
-    return ok(notes.map((n) => ({ id: n.id, title: n.title, folder: n.folder, format: n.format, tags: n.tags, updatedAt: n.updatedAt })));
-  });
-
-  server.registerTool("get_note", { title: "위키 문서 조회", description: "위키 문서 전체 내용을 조회합니다.", inputSchema: { id: z.string() } }, async ({ id }) => {
-    const note = await prisma.note.findUnique({ where: { id } });
-    if (!note) return err("문서를 찾을 수 없습니다.");
-    return ok(note);
-  });
-
-  server.registerTool(
-    "create_note",
-    {
-      title: "위키 문서 생성",
-      description: "새 위키 문서를 만듭니다. format은 md 또는 html. 자연어 요청은 할일/체크리스트/위키 중 어디에 넣을지 애매한 경우가 많으므로," + CONFIRM_NOTE,
-      inputSchema: {
-        title: z.string(),
-        folder: z.string().optional(),
-        tags: z.array(z.string()).optional(),
-        format: z.enum(["md", "html"]).optional(),
-        content: z.string().optional(),
-        ...CONFIRM_FIELD,
-      },
-    },
-    async (args) => {
-      if (args.confirm !== true) {
-        return ok({
-          preview: true,
-          message: `아직 생성되지 않았습니다. 다음 내용으로 위키 문서를 생성하려 합니다: "${args.title}"${args.folder ? ` (폴더: ${args.folder})` : ""} (format: ${args.format || "md"}). 사용자에게 먼저 알리고 확인받은 후 confirm:true로 다시 호출하세요.`,
-        });
-      }
-      const format = args.format || "md";
-      const content = args.content ?? (format === "html" ? `<h1>${args.title}</h1>\n<p></p>\n` : `# ${args.title}\n\n`);
-      const note = await prisma.note.create({ data: { title: args.title, folder: args.folder || "", tags: args.tags || [], format, content, ownerId: user.id } });
-      return ok(note);
-    }
-  );
-
-  server.registerTool("update_note", { title: "위키 문서 수정", description: "위키 문서 내용을 수정합니다.", inputSchema: { id: z.string(), content: z.string() } }, async ({ id, content }) => {
-    const note = await prisma.note.update({ where: { id }, data: { content } });
-    return ok(note);
-  });
-
-  server.registerTool(
-    "delete_note",
-    { title: "위키 문서 삭제", description: "위키 문서를 삭제합니다 (되돌릴 수 없음)." + CONFIRM_NOTE, inputSchema: { id: z.string(), ...CONFIRM_FIELD } },
-    async ({ id, confirm }) => {
-      const note = await prisma.note.findUnique({ where: { id } });
-      if (!note) return err("문서를 찾을 수 없습니다.");
-      if (confirm !== true) {
-        return ok({ preview: true, message: `"${note.title}" 문서를 삭제하려 합니다. 되돌릴 수 없습니다. 사용자에게 먼저 알리고 확인받은 후 confirm:true로 다시 호출하세요.` });
-      }
-      await prisma.note.delete({ where: { id } });
-      return ok({ deleted: id });
-    }
-  );
-
   // ---------- checklists ----------
   server.registerTool("list_checklists", { title: "체크리스트 목록", description: "체크리스트 문서 목록을 조회합니다.", inputSchema: { folder: z.string().optional() } }, async ({ folder }) => {
     const checklists = await prisma.checklist.findMany({ where: folder !== undefined ? { folder } : undefined, orderBy: [{ folder: "asc" }, { title: "asc" }] });
@@ -300,29 +240,17 @@ export function buildMcpServer(user: CurrentUser): McpServer {
   );
 
   // ---------- files ----------
-  // __kb__/<폴더>/<제목>.<형식> 경로는 디스크가 아니라 지식베이스 Note를 가리킨다 (lib/kb-files.ts) --
-  // 웹 UI의 통합 파일 탐색기(/files)가 쓰는 것과 똑같은 isKbPath 분기를 여기서도 그대로 적용해,
-  // 파일 도구로도 지식베이스 문서를 다룰 수 있게 한다. 새 문서 생성은 title/folder/format 같은
-  // 구조화된 입력이 필요해 이 경로 기반 도구들로는 못 하므로 create_note를 그대로 쓴다.
-  server.registerTool("list_files", { title: "파일 목록", description: "SYNC_FOLDER_PATH 내 폴더 내용을 나열합니다. __kb__ 경로를 주면 지식베이스 문서도 볼 수 있습니다.", inputSchema: { dir: z.string().optional() } }, async ({ dir }) => {
+  server.registerTool("list_files", { title: "파일 목록", description: "SYNC_FOLDER_PATH 내 폴더 내용을 나열합니다.", inputSchema: { dir: z.string().optional() } }, async ({ dir }) => {
     try {
-      const d = dir || "";
-      if (isKbPath(d)) return ok(await listKbEntries(d));
-      const entries = await listDir(d);
-      if (d === "") entries.unshift(kbRootEntry);
+      const entries = await listDir(dir || "");
       return ok(entries);
     } catch (e) {
       return err(e instanceof UnsafePathError ? e.message : "폴더를 읽을 수 없습니다.");
     }
   });
 
-  server.registerTool("read_file", { title: "파일 읽기", description: "텍스트 파일 내용을 읽습니다 (최대 200KB). __kb__ 경로면 해당 지식베이스 문서를 읽습니다. 바이너리 파일은 지원하지 않습니다.", inputSchema: { path: z.string() } }, async ({ path: relPath }) => {
+  server.registerTool("read_file", { title: "파일 읽기", description: "텍스트 파일 내용을 읽습니다 (최대 200KB). 바이너리 파일은 지원하지 않습니다.", inputSchema: { path: z.string() } }, async ({ path: relPath }) => {
     try {
-      if (isKbPath(relPath)) {
-        const note = await resolveKbNote(relPath);
-        if (!note) return err("문서를 찾을 수 없습니다.");
-        return ok(note.content.slice(0, 200_000));
-      }
       const buf = await readFileBuffer(relPath);
       return ok(buf.toString("utf-8").slice(0, 200_000));
     } catch (e) {
@@ -330,15 +258,8 @@ export function buildMcpServer(user: CurrentUser): McpServer {
     }
   });
 
-  server.registerTool("write_file", { title: "파일 쓰기", description: "텍스트 파일을 생성하거나 덮어씁니다. __kb__ 경로는 이미 존재하는 지식베이스 문서의 내용만 덮어쓸 수 있습니다 -- 새 문서는 create_note로 만드세요.", inputSchema: { path: z.string(), content: z.string() } }, async ({ path: relPath, content }) => {
+  server.registerTool("write_file", { title: "파일 쓰기", description: "텍스트 파일을 생성하거나 덮어씁니다.", inputSchema: { path: z.string(), content: z.string() } }, async ({ path: relPath, content }) => {
     try {
-      if (isKbPath(relPath)) {
-        const note = await resolveKbNote(relPath);
-        if (!note) return err("해당 경로의 지식베이스 문서가 없습니다. 새 문서는 create_note로 만드세요.");
-        await prisma.note.update({ where: { id: note.id }, data: { content } });
-        await writeAudit(user, "note.update", note.title, { via: "mcp" });
-        return ok({ written: relPath });
-      }
       await writeFsFile(relPath, Buffer.from(content, "utf-8"));
       await writeAudit(user, "file.write", relPath, { via: "mcp" });
       return ok({ written: relPath });
@@ -349,19 +270,12 @@ export function buildMcpServer(user: CurrentUser): McpServer {
 
   server.registerTool(
     "delete_file",
-    { title: "파일/폴더 삭제", description: "파일 또는 폴더를 삭제합니다 (되돌릴 수 없음). __kb__ 경로면 해당 지식베이스 문서를 삭제합니다." + CONFIRM_NOTE, inputSchema: { path: z.string(), ...CONFIRM_FIELD } },
+    { title: "파일/폴더 삭제", description: "파일 또는 폴더를 삭제합니다 (되돌릴 수 없음)." + CONFIRM_NOTE, inputSchema: { path: z.string(), ...CONFIRM_FIELD } },
     async ({ path: relPath, confirm }) => {
       if (confirm !== true) {
         return ok({ preview: true, message: `"${relPath}"을(를) 삭제하려 합니다. 폴더라면 내용물도 함께 삭제되고, 되돌릴 수 없습니다. 사용자에게 먼저 알리고 확인받은 후 confirm:true로 다시 호출하세요.` });
       }
       try {
-        if (isKbPath(relPath)) {
-          const note = await resolveKbNote(relPath);
-          if (!note) return err("문서를 찾을 수 없습니다.");
-          await prisma.note.delete({ where: { id: note.id } });
-          await writeAudit(user, "note.delete", note.title, { via: "mcp" });
-          return ok({ deleted: relPath });
-        }
         await deleteEntry(relPath);
         await writeAudit(user, "file.delete", relPath, { via: "mcp" });
         return ok({ deleted: relPath });
@@ -371,13 +285,8 @@ export function buildMcpServer(user: CurrentUser): McpServer {
     }
   );
 
-  server.registerTool("rename_file", { title: "파일 이름변경/이동", description: "파일 또는 폴더 이름을 바꾸거나 이동합니다. __kb__ 경로끼리는 지식베이스 문서의 제목/폴더를 바꿀 수 있습니다 (형식/확장자는 바꿀 수 없음).", inputSchema: { from: z.string(), to: z.string() } }, async ({ from, to }) => {
+  server.registerTool("rename_file", { title: "파일 이름변경/이동", description: "파일 또는 폴더 이름을 바꾸거나 이동합니다.", inputSchema: { from: z.string(), to: z.string() } }, async ({ from, to }) => {
     try {
-      if (isKbPath(from) || isKbPath(to)) {
-        await renameOrMoveKbNote(from, to);
-        await writeAudit(user, "note.rename", from, { to, via: "mcp" });
-        return ok({ from, to });
-      }
       await renameOrMoveEntry(from, to);
       await writeAudit(user, "file.rename", from, { to, via: "mcp" });
       return ok({ from, to });
@@ -386,9 +295,8 @@ export function buildMcpServer(user: CurrentUser): McpServer {
     }
   });
 
-  server.registerTool("mkdir", { title: "폴더 생성", description: "새 폴더를 만듭니다 (디스크 전용 -- 지식베이스 폴더는 create_note에 folder를 지정하면 자동으로 생깁니다).", inputSchema: { dir: z.string() } }, async ({ dir }) => {
+  server.registerTool("mkdir", { title: "폴더 생성", description: "새 폴더를 만듭니다.", inputSchema: { dir: z.string() } }, async ({ dir }) => {
     try {
-      if (isKbPath(dir)) return err("지식베이스 폴더는 따로 만들 수 없습니다. create_note 호출 시 folder를 지정하면 자동으로 생성됩니다.");
       await ensureDir(dir);
       return ok({ created: dir });
     } catch (e) {

@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, useActionState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { ShareDialog } from "./ShareDialog";
 import { MoveCopyDialog } from "./MoveCopyDialog";
 import { DocEditor } from "./DocEditor";
-import { createNoteAction, type CreateNoteState } from "@/app/actions/wiki";
 
 interface FileEntry {
   name: string;
@@ -13,21 +12,6 @@ interface FileEntry {
   size: number;
   mtime: string;
   ext: string;
-  tags?: string[];
-}
-
-const KB_ROOT = "__kb__";
-const KB_UNFILED = "(미분류)";
-
-function isKb(p: string) {
-  return p === KB_ROOT || p.startsWith(KB_ROOT + "/");
-}
-
-/** The note's current folder, decoded from the __kb__/<folder> dir the tree has it open under. */
-function kbFolderFromDir(dir: string): string {
-  if (!isKb(dir) || dir === KB_ROOT) return "";
-  const decoded = decodeURIComponent(dir.slice(KB_ROOT.length + 1));
-  return decoded === KB_UNFILED ? "" : decoded;
 }
 
 function ancestorsOf(p: string): string[] {
@@ -44,9 +28,7 @@ function ancestorsOf(p: string): string[] {
 
 function matchesFilter(entry: FileEntry, query: string): boolean {
   if (!query) return true;
-  const q = query.toLowerCase();
-  if (entry.name.toLowerCase().includes(q)) return true;
-  return entry.tags?.some((t) => t.toLowerCase().includes(q)) ?? false;
+  return entry.name.toLowerCase().includes(query.toLowerCase());
 }
 
 const EXT_COLOR: Record<string, [string, string]> = {
@@ -85,7 +67,6 @@ function TreeNode({
   onSelectFile,
   onDelete,
   onMoveCopy,
-  onMoveKbNote,
   onDropMove,
 }: {
   path: string;
@@ -103,19 +84,16 @@ function TreeNode({
   onSelectFile: (entry: FileEntry) => void;
   onDelete: (path: string, isDir: boolean) => void;
   onMoveCopy: (path: string, isDir: boolean) => void;
-  onMoveKbNote: (path: string) => void;
   onDropMove: (sourcePath: string, sourceIsDir: boolean, targetDir: string) => void;
 }) {
   const isExpanded = expanded.has(path);
   const loaded = path in dirCache;
   const kids = entry.isDir ? (dirCache[path] || []).filter((e) => e.isDir || matchesFilter(e, filter)) : [];
-  const kb = isKb(path);
   const isActiveDir = !entry.isDir ? false : dir === path;
   const isActiveFile = !entry.isDir && selectedPath === path;
   const [ib, ifg] = !entry.isDir ? EXT_COLOR[entry.ext] || ["var(--panel3)", "var(--ink2)"] : ["", ""];
   const [dragOver, setDragOver] = useState(false);
-  // 폴더 자체(디스크든 KB든)로는 어디에도 드래그로 옮길 수 없음 -- 버튼형 이동/삭제와 동일 기준.
-  const draggableSelf = canWrite && !(entry.isDir && kb) && path !== KB_ROOT;
+  const draggableSelf = canWrite;
   const isDropTarget = canWrite && entry.isDir;
 
   return (
@@ -181,7 +159,7 @@ function TreeNode({
           }}
         >
           {entry.isDir ? (
-            <span style={{ fontSize: 11, opacity: 0.85, flex: "none" }}>{kb ? "📚" : "📁"}</span>
+            <span style={{ fontSize: 11, opacity: 0.85, flex: "none" }}>📁</span>
           ) : (
             <span style={{ width: 18, height: 18, flex: "none", borderRadius: 4, display: "grid", placeItems: "center", fontSize: 7.5, fontWeight: 700, background: ib, color: ifg }}>
               {entry.ext || "-"}
@@ -189,11 +167,11 @@ function TreeNode({
           )}
           <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
         </button>
-        {canWrite && !(entry.isDir && kb) && path !== KB_ROOT && (
+        {canWrite && (
           <>
             <button
-              onClick={() => (kb && !entry.isDir ? onMoveKbNote(path) : onMoveCopy(path, entry.isDir))}
-              title={kb ? "폴더 이동" : entry.isDir ? "폴더 이동/복사" : "이동/복사"}
+              onClick={() => onMoveCopy(path, entry.isDir)}
+              title={entry.isDir ? "폴더 이동/복사" : "이동/복사"}
               style={{ flex: "none", width: 18, height: 20, border: 0, background: "transparent", color: "var(--ink3)", cursor: "pointer", fontSize: 10.5 }}
             >
               ⇄
@@ -228,7 +206,6 @@ function TreeNode({
             onSelectFile={onSelectFile}
             onDelete={onDelete}
             onMoveCopy={onMoveCopy}
-            onMoveKbNote={onMoveKbNote}
             onDropMove={onDropMove}
           />
         ))}
@@ -236,49 +213,18 @@ function TreeNode({
   );
 }
 
-const initialCreateNote: CreateNoteState = {};
-
-/** 새 문서 만들기 -- 지식베이스 하위에서는 제목/폴더/태그/형식(노트 생성), 디스크 폴더에서는
- * 파일명/형식(새 파일 생성)으로 입력 필드가 바뀐다. */
+/** 새 문서 만들기 -- 파일명/형식을 입력받아 새 .md/.html 파일을 만든다. */
 function CreateDocForm({
-  inKb,
-  defaultFolder,
   onCreateDisk,
   onDone,
 }: {
-  inKb: boolean;
-  defaultFolder: string;
   onCreateDisk: (name: string, format: "md" | "html") => Promise<string | void>;
   onDone: () => void;
 }) {
-  const [noteState, noteFormAction, notePending] = useActionState(createNoteAction, initialCreateNote);
   const [diskName, setDiskName] = useState("");
   const [diskFormat, setDiskFormat] = useState<"md" | "html">("md");
   const [diskPending, setDiskPending] = useState(false);
   const [diskError, setDiskError] = useState<string | null>(null);
-
-  if (inKb) {
-    return (
-      <form action={noteFormAction} style={{ display: "grid", gap: 6, marginBottom: 10, padding: 8, border: "1px solid var(--line)", borderRadius: 7, background: "var(--panel2)" }}>
-        <input name="title" placeholder="제목" required style={{ height: 26, padding: "0 8px", border: "1px solid var(--line)", borderRadius: 5, background: "var(--panel)", color: "var(--ink)", fontSize: 12 }} />
-        <input name="folder" placeholder="폴더 (예: Ops / 배포)" defaultValue={defaultFolder} style={{ height: 26, padding: "0 8px", border: "1px solid var(--line)", borderRadius: 5, background: "var(--panel)", color: "var(--ink)", fontSize: 12 }} />
-        <input name="tags" placeholder="태그 (쉼표로 구분)" style={{ height: 26, padding: "0 8px", border: "1px solid var(--line)", borderRadius: 5, background: "var(--panel)", color: "var(--ink)", fontSize: 12 }} />
-        <select name="format" defaultValue="md" style={{ height: 26, border: "1px solid var(--line)", borderRadius: 5, background: "var(--panel)", color: "var(--ink)", fontSize: 12 }}>
-          <option value="md">마크다운 (.md)</option>
-          <option value="html">HTML (.html)</option>
-        </select>
-        <div style={{ display: "flex", gap: 5 }}>
-          <button type="submit" disabled={notePending} style={{ flex: 1, height: 26, border: 0, borderRadius: 5, background: "var(--accent)", color: "var(--on-accent)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-            {notePending ? "생성 중..." : "생성"}
-          </button>
-          <button type="button" onClick={onDone} style={{ height: 26, padding: "0 9px", border: "1px solid var(--line)", borderRadius: 5, background: "var(--panel)", color: "var(--ink2)", fontSize: 12, cursor: "pointer" }}>
-            취소
-          </button>
-        </div>
-        {noteState.error && <div style={{ fontSize: 11, color: "var(--err)" }}>{noteState.error}</div>}
-      </form>
-    );
-  }
 
   const submitDisk = async () => {
     setDiskError(null);
@@ -347,8 +293,6 @@ export function FilesBrowser({
   const [docSavedAt, setDocSavedAt] = useState<string | null>(null);
   const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false);
 
-  const inKb = isKb(dir);
-  const writable = canWrite && !inKb;
   const isDoc = selected && (selected.ext === "MD" || selected.ext === "HTML");
 
   const ensureLoaded = useCallback(async (path: string, force = false): Promise<FileEntry[]> => {
@@ -517,45 +461,9 @@ export function FilesBrowser({
     }
   };
 
-  const moveKbNoteAt = async (relPath: string) => {
-    const name = relPath.slice(relPath.lastIndexOf("/") + 1);
-    const parentDir = relPath.slice(0, relPath.lastIndexOf("/"));
-    const currentFolder = kbFolderFromDir(parentDir);
-    const input = prompt("이동할 폴더 (지식베이스 내)", currentFolder);
-    if (input === null) return;
-    const folder = input.trim();
-    if (folder === currentFolder) return;
-    const newDir = `${KB_ROOT}/${encodeURIComponent(folder || KB_UNFILED)}`;
-    const to = `${newDir}/${name}`;
-    const res = await fetch("/api/files", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "rename", from: relPath, to }),
-    });
-    if (res.ok) {
-      ensureLoaded(parentDir, true);
-      ensureLoaded(newDir, true);
-      if (selected?.relPath === relPath) {
-        setSelected(null);
-        setPreview(null);
-      }
-    } else {
-      const data = await res.json().catch(() => ({}));
-      alert(data.error || "이동할 수 없습니다.");
-    }
-  };
-
-  const moveKbNoteSelected = () => selected && moveKbNoteAt(selected.relPath);
-
   /** 트리에서 드래그&드롭으로 폴더에 끌어다 놓았을 때의 이동 -- 목적지가 이미 정확히 정해져
    * 있으므로(폴더/복사 선택 다이얼로그 없이) 바로 rename 액션을 호출한다. */
   const moveEntryTo = async (sourcePath: string, sourceIsDir: boolean, targetDir: string) => {
-    const sourceKb = isKb(sourcePath);
-    const targetKb = isKb(targetDir);
-    if (sourceKb !== targetKb) {
-      alert("지식베이스 문서와 디스크 파일은 서로 다른 위치로 이동할 수 없습니다.");
-      return;
-    }
     const name = sourcePath.slice(sourcePath.lastIndexOf("/") + 1);
     const currentParent = sourcePath.includes("/") ? sourcePath.slice(0, sourcePath.lastIndexOf("/")) : "";
     if (sourceIsDir && (targetDir === sourcePath || targetDir.startsWith(sourcePath + "/"))) {
@@ -563,8 +471,7 @@ export function FilesBrowser({
       return;
     }
 
-    const actualTargetDir = sourceKb && targetDir === KB_ROOT ? `${KB_ROOT}/${encodeURIComponent(KB_UNFILED)}` : targetDir;
-    const to = actualTargetDir ? `${actualTargetDir}/${name}` : name;
+    const to = targetDir ? `${targetDir}/${name}` : name;
     if (to === sourcePath) return;
 
     const res = await fetch("/api/files", {
@@ -574,12 +481,12 @@ export function FilesBrowser({
     });
     if (res.ok) {
       ensureLoaded(currentParent, true);
-      ensureLoaded(actualTargetDir, true);
+      ensureLoaded(targetDir, true);
       if (selected?.relPath === sourcePath) {
         setSelected(null);
         setPreview(null);
       }
-      if (sourceIsDir && (dir === sourcePath || dir.startsWith(sourcePath + "/"))) loadDir(actualTargetDir);
+      if (sourceIsDir && (dir === sourcePath || dir.startsWith(sourcePath + "/"))) loadDir(targetDir);
     } else {
       const data = await res.json().catch(() => ({}));
       alert(data.error || "이동할 수 없습니다.");
@@ -718,7 +625,6 @@ export function FilesBrowser({
             onSelectFile={loadPreview}
             onDelete={(p, isDir) => deletePath(p, isDir)}
             onMoveCopy={(p, isDir) => setMovingCopying({ relPath: p, isDir })}
-            onMoveKbNote={moveKbNoteAt}
             onDropMove={moveEntryTo}
           />
         ))}
@@ -732,17 +638,17 @@ export function FilesBrowser({
 
       <section
         onDragOver={(e) => {
-          if (!writable) return;
+          if (!canWrite) return;
           e.preventDefault();
           setDragOverUpload(true);
         }}
         onDragLeave={(e) => {
-          if (!writable) return;
+          if (!canWrite) return;
           if (e.currentTarget.contains(e.relatedTarget as Node)) return;
           setDragOverUpload(false);
         }}
         onDrop={(e) => {
-          if (!writable) return;
+          if (!canWrite) return;
           e.preventDefault();
           setDragOverUpload(false);
           upload(e.dataTransfer.files);
@@ -779,36 +685,32 @@ export function FilesBrowser({
           <>
             <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderBottom: "1px solid var(--line)" }}>
               <div style={{ fontFamily: "var(--font-mono), monospace", fontSize: 11.5, color: "var(--ink3)", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {inKb ? "지식베이스" : dir ? `/${dir}` : "/ (전체 파일)"}
+                {dir ? `/${dir}` : "/ (전체 파일)"}
               </div>
             </div>
             {canWrite && (
               <div style={{ display: "flex", gap: 6, padding: "8px 14px", borderBottom: "1px solid var(--line)" }}>
-                {!inKb && <input ref={fileInput} type="file" multiple hidden onChange={(e) => upload(e.target.files)} />}
-                {!inKb && (
-                  <button
-                    onClick={() => fileInput.current?.click()}
-                    style={{ height: 26, padding: "0 10px", border: 0, borderRadius: 6, background: "var(--accent)", color: "var(--on-accent)", fontSize: 11.5, fontWeight: 600, cursor: "pointer" }}
-                  >
-                    ↑ 업로드
-                  </button>
-                )}
+                <input ref={fileInput} type="file" multiple hidden onChange={(e) => upload(e.target.files)} />
+                <button
+                  onClick={() => fileInput.current?.click()}
+                  style={{ height: 26, padding: "0 10px", border: 0, borderRadius: 6, background: "var(--accent)", color: "var(--on-accent)", fontSize: 11.5, fontWeight: 600, cursor: "pointer" }}
+                >
+                  ↑ 업로드
+                </button>
                 <button
                   onClick={() => setCreatingDoc((v) => !v)}
                   style={{ height: 26, padding: "0 10px", border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel2)", color: "var(--ink2)", fontSize: 11.5, cursor: "pointer" }}
                 >
                   + 새 문서
                 </button>
-                {!inKb && (
-                  <button onClick={mkdir} style={{ height: 26, padding: "0 10px", border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel2)", color: "var(--ink2)", fontSize: 11.5, cursor: "pointer" }}>
-                    새 폴더
-                  </button>
-                )}
+                <button onClick={mkdir} style={{ height: 26, padding: "0 10px", border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel2)", color: "var(--ink2)", fontSize: 11.5, cursor: "pointer" }}>
+                  새 폴더
+                </button>
               </div>
             )}
             {creatingDoc && canWrite && (
               <div style={{ padding: "10px 14px 0" }}>
-                <CreateDocForm inKb={inKb} defaultFolder={kbFolderFromDir(dir)} onCreateDisk={createDiskDoc} onDone={() => setCreatingDoc(false)} />
+                <CreateDocForm onCreateDisk={createDiskDoc} onDone={() => setCreatingDoc(false)} />
               </div>
             )}
             {loading && <div style={{ padding: 20, fontSize: 12.5, color: "var(--ink3)" }}>불러오는 중...</div>}
@@ -895,10 +797,10 @@ export function FilesBrowser({
                     이름변경
                   </button>
                   <button
-                    onClick={() => (inKb ? moveKbNoteSelected() : setMovingCopying({ relPath: selected.relPath, isDir: false }))}
+                    onClick={() => setMovingCopying({ relPath: selected.relPath, isDir: false })}
                     style={{ height: 27, padding: "0 10px", border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel2)", color: "var(--ink2)", fontSize: 11.5, cursor: "pointer" }}
                   >
-                    {inKb ? "폴더 이동" : "이동/복사"}
+                    이동/복사
                   </button>
                   <button
                     onClick={() => deletePath(selected.relPath, false)}
@@ -958,7 +860,7 @@ export function FilesBrowser({
                   METADATA
                 </div>
                 {[
-                  { k: "경로", v: `/${selected.relPath.replace(/^__kb__\//, "지식베이스/")}` },
+                  { k: "경로", v: `/${selected.relPath}` },
                   { k: "크기", v: fmtSize(selected.size) },
                   { k: "수정", v: new Date(selected.mtime).toLocaleString("ko-KR") },
                 ].map((m) => (
@@ -967,15 +869,6 @@ export function FilesBrowser({
                     <span style={{ fontFamily: "var(--font-mono), monospace", color: "var(--ink2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.v}</span>
                   </div>
                 ))}
-                {inKb && selected.tags && selected.tags.length > 0 && (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 8 }}>
-                    {selected.tags.map((t) => (
-                      <span key={t} style={{ fontSize: 10.5, padding: "2px 7px", borderRadius: 999, border: "1px solid var(--line)", color: "var(--ink2)", background: "var(--panel2)" }}>
-                        {t}
-                      </span>
-                    ))}
-                  </div>
-                )}
               </div>
             )}
           </>

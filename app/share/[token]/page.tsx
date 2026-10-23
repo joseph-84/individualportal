@@ -3,7 +3,6 @@ import path from "node:path";
 import { prisma } from "@/lib/prisma";
 import { shareAccessCookieName, verifyShareAccessToken } from "@/lib/share-otp-auth";
 import { previewKind } from "@/lib/files";
-import { isKbPath, resolveKbNote } from "@/lib/kb-files";
 import { ShareOtpGate } from "@/components/ShareOtpGate";
 import { ShareViewer } from "@/components/ShareViewer";
 
@@ -54,9 +53,7 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
 
   const ext = path.extname(link.relPath).replace(".", "").toUpperCase();
   const kind = previewKind(ext);
-  const fileName = isKbPath(link.relPath)
-    ? await resolveKbNote(link.relPath).then((n) => (n ? `${n.title}.${n.format}` : path.basename(link.relPath)))
-    : path.basename(link.relPath);
+  const fileName = path.basename(link.relPath);
 
   if (link.scope === "public") {
     return (

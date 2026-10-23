@@ -14,11 +14,9 @@ const MD_TOOLBAR: { label: string; before: string; after: string; block?: boolea
   { label: "표", before: "\n| 열1 | 열2 |\n| --- | --- |\n| 값1 | 값2 |\n", after: "", extra: true },
 ];
 
-/** Shared viewer/editor for anything rendered through lib/markdown.ts's renderNote -- a disk
- * .md/.html file (lib/files.ts) or a knowledge-base note (Prisma, via lib/kb-files.ts). The
- * caller (FilesBrowser) owns mode/source/save/delete and the KB-vs-disk branching; this
- * component only knows how to show and edit document content, same split as WikiEditor used to
- * have internally before notes and disk files shared one viewer. */
+/** Shared viewer/editor for a disk .md/.html file, rendered through lib/markdown.ts's
+ * renderNote. The caller (FilesBrowser) owns mode/source/save/delete; this component only
+ * knows how to show and edit document content. */
 export function DocEditor({
   mode,
   title,

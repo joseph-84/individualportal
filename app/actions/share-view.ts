@@ -5,14 +5,9 @@ import { prisma } from "@/lib/prisma";
 import { generateOtpCode } from "@/lib/share";
 import { sendOtpEmail, MailerNotConfiguredError } from "@/lib/mailer";
 import { createShareAccessToken, shareAccessCookieName, SHARE_ACCESS_MAX_AGE } from "@/lib/share-otp-auth";
-import { isKbPath, resolveKbNote } from "@/lib/kb-files";
 import path from "node:path";
 
 async function displayFileName(relPath: string): Promise<string> {
-  if (isKbPath(relPath)) {
-    const note = await resolveKbNote(relPath);
-    return note ? `${note.title}.${note.format}` : path.basename(relPath);
-  }
   return path.basename(relPath);
 }
 

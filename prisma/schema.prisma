@@ -19,7 +19,6 @@ model User {
   lockedUntil        DateTime?
   tokenVersion       Int                      @default(0)
   todos              Todo[]
-  notes              Note[]
   checklists         Checklist[]
   scriptRuns         ScriptRun[]
   auditLogs          AuditLog[]
@@ -61,19 +60,6 @@ model Todo {
   parent      Todo?     @relation("TodoChildren", fields: [parentId], references: [id], onDelete: Cascade)
   children    Todo[]    @relation("TodoChildren")
   createdAt   DateTime  @default(now())
-}
-
-model Note {
-  id        String   @id @default(cuid())
-  title     String
-  folder    String   @default("")
-  format    String   @default("md") // "md" | "html"
-  content   String
-  tags      String[]
-  ownerId   String
-  owner     User     @relation(fields: [ownerId], references: [id])
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 }
 
 model Checklist {

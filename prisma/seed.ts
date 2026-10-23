@@ -34,31 +34,6 @@ async function main() {
     });
   }
 
-  const noteCount = await prisma.note.count();
-  if (noteCount === 0) {
-    await prisma.note.create({
-      data: {
-        title: "주간 배포 체크리스트",
-        folder: "Ops/배포",
-        tags: ["배포", "온콜"],
-        ownerId: admin.id,
-        content: `# 주간 배포 체크리스트
-
-배포 전 확인할 항목을 순서대로 정리했다.
-자동화 스크립트가 대신 수행하는 단계는 \`auto\` 로 표시한다.
-
-## 1. 사전 점검
-
-- 스테이징 스모크 테스트 통과 확인
-- DB 마이그레이션 dry-run 로그 검토 \`auto\`
-- 롤백 스크립트 존재 확인
-
-> 금요일 16시 이후 배포 금지. 예외는 온콜 승인 필요.
-`,
-      },
-    });
-  }
-
   const scriptCount = await prisma.scriptDef.count();
   if (scriptCount === 0) {
     await prisma.scriptDef.createMany({
