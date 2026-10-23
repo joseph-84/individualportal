@@ -86,6 +86,7 @@ function TreeNode({
   onDelete,
   onMoveCopy,
   onMoveKbNote,
+  onDropMove,
 }: {
   path: string;
   name: string;
@@ -103,6 +104,7 @@ function TreeNode({
   onDelete: (path: string, isDir: boolean) => void;
   onMoveCopy: (path: string, isDir: boolean) => void;
   onMoveKbNote: (path: string) => void;
+  onDropMove: (sourcePath: string, sourceIsDir: boolean, targetDir: string) => void;
 }) {
   const isExpanded = expanded.has(path);
   const loaded = path in dirCache;
@@ -111,10 +113,49 @@ function TreeNode({
   const isActiveDir = !entry.isDir ? false : dir === path;
   const isActiveFile = !entry.isDir && selectedPath === path;
   const [ib, ifg] = !entry.isDir ? EXT_COLOR[entry.ext] || ["var(--panel3)", "var(--ink2)"] : ["", ""];
+  const [dragOver, setDragOver] = useState(false);
+  // 폴더 자체(디스크든 KB든)로는 어디에도 드래그로 옮길 수 없음 -- 버튼형 이동/삭제와 동일 기준.
+  const draggableSelf = canWrite && !(entry.isDir && kb) && path !== KB_ROOT;
+  const isDropTarget = canWrite && entry.isDir;
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", borderRadius: 6, background: isActiveDir || isActiveFile ? "var(--accent-soft)" : "transparent" }}>
+      <div
+        draggable={draggableSelf}
+        onDragStart={(e) => {
+          if (!draggableSelf) return;
+          e.dataTransfer.setData("application/x-fb-entry", JSON.stringify({ path, isDir: entry.isDir }));
+          e.dataTransfer.effectAllowed = "move";
+        }}
+        onDragOver={(e) => {
+          if (!isDropTarget) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+        }}
+        onDragEnter={(e) => {
+          if (!isDropTarget) return;
+          e.preventDefault();
+          setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          if (!isDropTarget) return;
+          e.preventDefault();
+          setDragOver(false);
+          const raw = e.dataTransfer.getData("application/x-fb-entry");
+          if (!raw) return;
+          const src = JSON.parse(raw) as { path: string; isDir: boolean };
+          onDropMove(src.path, src.isDir, path);
+        }}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          borderRadius: 6,
+          outline: dragOver ? "2px solid var(--accent)" : "none",
+          outlineOffset: -1,
+          background: dragOver ? "var(--accent-soft)" : isActiveDir || isActiveFile ? "var(--accent-soft)" : "transparent",
+        }}
+      >
         <button
           onClick={() => (entry.isDir ? onToggle(path) : undefined)}
           style={{ width: 18, height: 26, flex: "none", border: 0, background: "transparent", color: "var(--ink3)", cursor: entry.isDir ? "pointer" : "default", fontSize: 15, lineHeight: 1, marginLeft: depth * 13 }}
@@ -188,6 +229,7 @@ function TreeNode({
             onDelete={onDelete}
             onMoveCopy={onMoveCopy}
             onMoveKbNote={onMoveKbNote}
+            onDropMove={onDropMove}
           />
         ))}
     </div>
@@ -295,6 +337,7 @@ export function FilesBrowser({
   const [sharing, setSharing] = useState(false);
   const [movingCopying, setMovingCopying] = useState<{ relPath: string; isDir: boolean } | null>(null);
   const [creatingDoc, setCreatingDoc] = useState(false);
+  const [rootDragOver, setRootDragOver] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
   // 문서(.md/.html, 디스크든 지식베이스든) 뷰어/에디터 상태 -- WikiEditor가 하던 역할을 여기로 올림.
@@ -504,6 +547,45 @@ export function FilesBrowser({
 
   const moveKbNoteSelected = () => selected && moveKbNoteAt(selected.relPath);
 
+  /** 트리에서 드래그&드롭으로 폴더에 끌어다 놓았을 때의 이동 -- 목적지가 이미 정확히 정해져
+   * 있으므로(폴더/복사 선택 다이얼로그 없이) 바로 rename 액션을 호출한다. */
+  const moveEntryTo = async (sourcePath: string, sourceIsDir: boolean, targetDir: string) => {
+    const sourceKb = isKb(sourcePath);
+    const targetKb = isKb(targetDir);
+    if (sourceKb !== targetKb) {
+      alert("지식베이스 문서와 디스크 파일은 서로 다른 위치로 이동할 수 없습니다.");
+      return;
+    }
+    const name = sourcePath.slice(sourcePath.lastIndexOf("/") + 1);
+    const currentParent = sourcePath.includes("/") ? sourcePath.slice(0, sourcePath.lastIndexOf("/")) : "";
+    if (sourceIsDir && (targetDir === sourcePath || targetDir.startsWith(sourcePath + "/"))) {
+      alert("폴더를 자기 자신의 하위 폴더로 이동할 수 없습니다.");
+      return;
+    }
+
+    const actualTargetDir = sourceKb && targetDir === KB_ROOT ? `${KB_ROOT}/${encodeURIComponent(KB_UNFILED)}` : targetDir;
+    const to = actualTargetDir ? `${actualTargetDir}/${name}` : name;
+    if (to === sourcePath) return;
+
+    const res = await fetch("/api/files", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "rename", from: sourcePath, to }),
+    });
+    if (res.ok) {
+      ensureLoaded(currentParent, true);
+      ensureLoaded(actualTargetDir, true);
+      if (selected?.relPath === sourcePath) {
+        setSelected(null);
+        setPreview(null);
+      }
+      if (sourceIsDir && (dir === sourcePath || dir.startsWith(sourcePath + "/"))) loadDir(actualTargetDir);
+    } else {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || "이동할 수 없습니다.");
+    }
+  };
+
   const afterMoveCopy = (destDir: string) => {
     if (!movingCopying) return;
     const { relPath, isDir } = movingCopying;
@@ -581,7 +663,35 @@ export function FilesBrowser({
             />
           </div>
         </div>
-        <div style={{ borderRadius: 6, background: dir === "" ? "var(--accent-soft)" : "transparent", marginBottom: 2 }}>
+        <div
+          onDragOver={(e) => {
+            if (!canWrite) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
+          }}
+          onDragEnter={(e) => {
+            if (!canWrite) return;
+            e.preventDefault();
+            setRootDragOver(true);
+          }}
+          onDragLeave={() => setRootDragOver(false)}
+          onDrop={(e) => {
+            if (!canWrite) return;
+            e.preventDefault();
+            setRootDragOver(false);
+            const raw = e.dataTransfer.getData("application/x-fb-entry");
+            if (!raw) return;
+            const src = JSON.parse(raw) as { path: string; isDir: boolean };
+            moveEntryTo(src.path, src.isDir, "");
+          }}
+          style={{
+            borderRadius: 6,
+            outline: rootDragOver ? "2px solid var(--accent)" : "none",
+            outlineOffset: -1,
+            background: rootDragOver ? "var(--accent-soft)" : dir === "" ? "var(--accent-soft)" : "transparent",
+            marginBottom: 2,
+          }}
+        >
           <button
             onClick={() => loadDir("")}
             style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", padding: "5px 8px", border: 0, borderRadius: 6, background: "transparent", color: dir === "" ? "var(--accent)" : "var(--ink2)", fontWeight: dir === "" ? 600 : 450, fontSize: 12.5, cursor: "pointer", textAlign: "left" }}
@@ -609,6 +719,7 @@ export function FilesBrowser({
             onDelete={(p, isDir) => deletePath(p, isDir)}
             onMoveCopy={(p, isDir) => setMovingCopying({ relPath: p, isDir })}
             onMoveKbNote={moveKbNoteAt}
+            onDropMove={moveEntryTo}
           />
         ))}
         <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--line2)", fontSize: 11.5, color: "var(--ink3)" }}>
