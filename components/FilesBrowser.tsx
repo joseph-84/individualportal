@@ -83,8 +83,9 @@ function TreeNode({
   onToggle,
   onSelectDir,
   onSelectFile,
-  onDeleteFolder,
-  onMoveCopyFolder,
+  onDelete,
+  onMoveCopy,
+  onMoveKbNote,
 }: {
   path: string;
   name: string;
@@ -99,8 +100,9 @@ function TreeNode({
   onToggle: (path: string) => void;
   onSelectDir: (path: string) => void;
   onSelectFile: (entry: FileEntry) => void;
-  onDeleteFolder: (path: string) => void;
-  onMoveCopyFolder: (path: string) => void;
+  onDelete: (path: string, isDir: boolean) => void;
+  onMoveCopy: (path: string, isDir: boolean) => void;
+  onMoveKbNote: (path: string) => void;
 }) {
   const isExpanded = expanded.has(path);
   const loaded = path in dirCache;
@@ -115,7 +117,7 @@ function TreeNode({
       <div style={{ display: "flex", alignItems: "center", borderRadius: 6, background: isActiveDir || isActiveFile ? "var(--accent-soft)" : "transparent" }}>
         <button
           onClick={() => (entry.isDir ? onToggle(path) : undefined)}
-          style={{ width: 18, height: 26, flex: "none", border: 0, background: "transparent", color: "var(--ink3)", cursor: entry.isDir ? "pointer" : "default", fontSize: 9, marginLeft: depth * 13 }}
+          style={{ width: 18, height: 26, flex: "none", border: 0, background: "transparent", color: "var(--ink3)", cursor: entry.isDir ? "pointer" : "default", fontSize: 15, lineHeight: 1, marginLeft: depth * 13 }}
         >
           {!entry.isDir ? "" : loaded && kids.length === 0 ? "" : isExpanded ? "▾" : "▸"}
         </button>
@@ -146,18 +148,18 @@ function TreeNode({
           )}
           <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
         </button>
-        {canWrite && entry.isDir && !kb && (
+        {canWrite && !(entry.isDir && kb) && path !== KB_ROOT && (
           <>
             <button
-              onClick={() => onMoveCopyFolder(path)}
-              title="폴더 이동/복사"
+              onClick={() => (kb && !entry.isDir ? onMoveKbNote(path) : onMoveCopy(path, entry.isDir))}
+              title={kb ? "폴더 이동" : entry.isDir ? "폴더 이동/복사" : "이동/복사"}
               style={{ flex: "none", width: 18, height: 20, border: 0, background: "transparent", color: "var(--ink3)", cursor: "pointer", fontSize: 10.5 }}
             >
               ⇄
             </button>
             <button
-              onClick={() => onDeleteFolder(path)}
-              title="폴더 삭제"
+              onClick={() => onDelete(path, entry.isDir)}
+              title={entry.isDir ? "폴더 삭제" : "삭제"}
               style={{ flex: "none", width: 18, height: 20, border: 0, background: "transparent", color: "var(--ink3)", cursor: "pointer", fontSize: 11 }}
             >
               ✕
@@ -183,8 +185,9 @@ function TreeNode({
             onToggle={onToggle}
             onSelectDir={onSelectDir}
             onSelectFile={onSelectFile}
-            onDeleteFolder={onDeleteFolder}
-            onMoveCopyFolder={onMoveCopyFolder}
+            onDelete={onDelete}
+            onMoveCopy={onMoveCopy}
+            onMoveKbNote={onMoveKbNote}
           />
         ))}
     </div>
@@ -471,30 +474,35 @@ export function FilesBrowser({
     }
   };
 
-  const moveKbNoteSelected = async () => {
-    if (!selected) return;
-    const currentFolder = kbFolderFromDir(dir);
+  const moveKbNoteAt = async (relPath: string) => {
+    const name = relPath.slice(relPath.lastIndexOf("/") + 1);
+    const parentDir = relPath.slice(0, relPath.lastIndexOf("/"));
+    const currentFolder = kbFolderFromDir(parentDir);
     const input = prompt("이동할 폴더 (지식베이스 내)", currentFolder);
     if (input === null) return;
     const folder = input.trim();
     if (folder === currentFolder) return;
     const newDir = `${KB_ROOT}/${encodeURIComponent(folder || KB_UNFILED)}`;
-    const to = `${newDir}/${selected.name}`;
+    const to = `${newDir}/${name}`;
     const res = await fetch("/api/files", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "rename", from: selected.relPath, to }),
+      body: JSON.stringify({ action: "rename", from: relPath, to }),
     });
     if (res.ok) {
-      ensureLoaded(dir, true);
+      ensureLoaded(parentDir, true);
       ensureLoaded(newDir, true);
-      setSelected(null);
-      setPreview(null);
+      if (selected?.relPath === relPath) {
+        setSelected(null);
+        setPreview(null);
+      }
     } else {
       const data = await res.json().catch(() => ({}));
       alert(data.error || "이동할 수 없습니다.");
     }
   };
+
+  const moveKbNoteSelected = () => selected && moveKbNoteAt(selected.relPath);
 
   const afterMoveCopy = (destDir: string) => {
     if (!movingCopying) return;
@@ -598,8 +606,9 @@ export function FilesBrowser({
             onToggle={toggleExpand}
             onSelectDir={loadDir}
             onSelectFile={loadPreview}
-            onDeleteFolder={(p) => deletePath(p, true)}
-            onMoveCopyFolder={(p) => setMovingCopying({ relPath: p, isDir: true })}
+            onDelete={(p, isDir) => deletePath(p, isDir)}
+            onMoveCopy={(p, isDir) => setMovingCopying({ relPath: p, isDir })}
+            onMoveKbNote={moveKbNoteAt}
           />
         ))}
         <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--line2)", fontSize: 11.5, color: "var(--ink3)" }}>
