@@ -5,19 +5,19 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requirePerm } from "@/lib/guard";
 import { writeAudit } from "@/lib/audit";
+import { kbPathFor } from "@/lib/kb-files";
 
-export async function saveNoteAction(id: string, content: string) {
-  await requirePerm("wiki", 2);
-  await prisma.note.update({ where: { id }, data: { content } });
-  revalidatePath("/wiki");
-}
-
+// Saving content, deleting, renaming, and moving an existing note all go through the unified
+// /api/files POST endpoint now (it branches on isKbPath the same way it already does for
+// read/render) so the file browser's buttons don't need to know whether a selected entry is a
+// disk file or a KB note -- only creation stays here, since it needs structured fields
+// (title/folder/tags/format) that don't fit the generic path-based write/delete/rename actions.
 export interface CreateNoteState {
   error?: string;
 }
 
 export async function createNoteAction(_prev: CreateNoteState, formData: FormData): Promise<CreateNoteState> {
-  const user = await requirePerm("wiki", 2);
+  const user = await requirePerm("files", 2);
   const title = String(formData.get("title") || "").trim();
   const folder = String(formData.get("folder") || "").trim();
   const tagsRaw = String(formData.get("tags") || "").trim();
@@ -30,15 +30,6 @@ export async function createNoteAction(_prev: CreateNoteState, formData: FormDat
     data: { title, folder, tags, format, content, ownerId: user.id },
   });
   await writeAudit(user, "note.create", title, { folder, format });
-  revalidatePath("/wiki");
-  redirect(`/wiki?id=${note.id}`);
-}
-
-export async function deleteNoteAction(id: string) {
-  const user = await requirePerm("wiki", 2);
-  const note = await prisma.note.findUniqueOrThrow({ where: { id } });
-  await prisma.note.delete({ where: { id } });
-  await writeAudit(user, "note.delete", note.title);
-  revalidatePath("/wiki");
-  redirect("/wiki");
+  revalidatePath("/files");
+  redirect(`/files?path=${encodeURIComponent(kbPathFor(note))}`);
 }

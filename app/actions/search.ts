@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/guard";
 import { listDir } from "@/lib/files";
+import { kbPathFor } from "@/lib/kb-files";
 
 export interface SearchResult {
   kind: "todo" | "note" | "file";
@@ -29,7 +30,7 @@ export async function searchAction(query: string): Promise<SearchResult[]> {
     where: { OR: [{ title: { contains: q, mode: "insensitive" } }, { content: { contains: q, mode: "insensitive" } }] },
     take: 5,
   });
-  for (const n of notes) results.push({ kind: "note", id: n.id, title: n.title, subtitle: n.folder || "위키", href: `/wiki?id=${n.id}` });
+  for (const n of notes) results.push({ kind: "note", id: n.id, title: n.title, subtitle: n.folder || "지식베이스", href: `/files?path=${encodeURIComponent(kbPathFor(n))}` });
 
   try {
     const walk = async (dir: string, depth: number): Promise<void> => {

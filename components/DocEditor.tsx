@@ -1,24 +1,8 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useRef } from "react";
 import { marked } from "marked";
-import { saveNoteAction, deleteNoteAction } from "@/app/actions/wiki";
 import { WikiHtmlEditor } from "./WikiHtmlEditor";
-
-interface Props {
-  noteId: string;
-  path: string;
-  title: string;
-  format: string; // "md" | "html"
-  content: string;
-  html: string;
-  updatedAt: string;
-  canWrite: boolean;
-}
-
-function seg(on: boolean): [string, string] {
-  return on ? ["var(--panel)", "var(--ink)"] : ["transparent", "var(--ink2)"];
-}
 
 const MD_TOOLBAR: { label: string; before: string; after: string; block?: boolean; extra?: boolean }[] = [
   { label: "H1", before: "# ", after: "", block: true },
@@ -30,23 +14,31 @@ const MD_TOOLBAR: { label: string; before: string; after: string; block?: boolea
   { label: "표", before: "\n| 열1 | 열2 |\n| --- | --- |\n| 값1 | 값2 |\n", after: "", extra: true },
 ];
 
-export function WikiEditor({ noteId, path, title, format, content, html, updatedAt, canWrite }: Props) {
-  const [mode, setMode] = useState<"view" | "edit">("view");
-  const [source, setSource] = useState(content);
-  const [pending, startTransition] = useTransition();
-  const [deleting, startDelete] = useTransition();
-  const [savedAt, setSavedAt] = useState<string | null>(null);
-  const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false);
-  const [viewBg, viewFg] = seg(mode === "view");
-  const [editBg, editFg] = seg(mode === "edit");
+/** Shared viewer/editor for anything rendered through lib/markdown.ts's renderNote -- a disk
+ * .md/.html file (lib/files.ts) or a knowledge-base note (Prisma, via lib/kb-files.ts). The
+ * caller (FilesBrowser) owns mode/source/save/delete and the KB-vs-disk branching; this
+ * component only knows how to show and edit document content, same split as WikiEditor used to
+ * have internally before notes and disk files shared one viewer. */
+export function DocEditor({
+  mode,
+  title,
+  format,
+  html,
+  source,
+  onSourceChange,
+  mobilePreviewOpen,
+  onCloseMobilePreview,
+}: {
+  mode: "view" | "edit";
+  title: string;
+  format: string; // "md" | "html"
+  html: string;
+  source: string;
+  onSourceChange: (next: string) => void;
+  mobilePreviewOpen: boolean;
+  onCloseMobilePreview: () => void;
+}) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  const save = () => {
-    startTransition(async () => {
-      await saveNoteAction(noteId, source);
-      setSavedAt(new Date().toLocaleTimeString("ko-KR"));
-    });
-  };
 
   const insert = (before: string, after: string, block?: boolean) => {
     const el = textareaRef.current;
@@ -57,7 +49,7 @@ export function WikiEditor({ noteId, path, title, format, content, html, updated
     const needsNewlineBefore = block && start > 0 && source[start - 1] !== "\n";
     const prefix = needsNewlineBefore ? "\n" : "";
     const next = source.slice(0, start) + prefix + before + selected + after + source.slice(end);
-    setSource(next);
+    onSourceChange(next);
     requestAnimationFrame(() => {
       el.focus();
       const cursor = start + prefix.length + before.length + selected.length + after.length;
@@ -65,69 +57,10 @@ export function WikiEditor({ noteId, path, title, format, content, html, updated
     });
   };
 
-  const remove = () => {
-    if (!confirm(`"${title}" 문서를 삭제할까요? 되돌릴 수 없습니다.`)) return;
-    startDelete(() => deleteNoteAction(noteId));
-  };
-
-  const livePreviewHtml = format === "md" ? (marked.parse(source, { async: false }) as string) : "";
+  const livePreviewHtml = mode === "edit" && format === "md" ? (marked.parse(source, { async: false }) as string) : "";
 
   return (
     <>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 15px", borderBottom: "1px solid var(--line)" }}>
-        <div style={{ fontFamily: "var(--font-mono), monospace", fontSize: 11.5, color: "var(--ink3)" }}>{path}</div>
-        <span style={{ fontSize: 9.5, fontWeight: 700, padding: "1px 5px", borderRadius: 4, background: "var(--panel3)", color: "var(--ink2)" }}>{format.toUpperCase()}</span>
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 9 }}>
-          <span style={{ fontSize: 11.5, color: "var(--ink3)" }}>
-            {pending ? "저장 중..." : savedAt ? `${savedAt} 저장됨` : `최종 수정 ${new Date(updatedAt).toLocaleString("ko-KR")}`}
-          </span>
-          {canWrite && (
-            <>
-              <div style={{ display: "flex", padding: 2, gap: 2, border: "1px solid var(--line)", borderRadius: 7, background: "var(--panel2)" }}>
-                <button
-                  onClick={() => setMode("view")}
-                  style={{ padding: "4px 11px", border: 0, borderRadius: 5, fontSize: 12, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap", background: viewBg, color: viewFg }}
-                >
-                  뷰어
-                </button>
-                <button
-                  onClick={() => setMode("edit")}
-                  style={{ padding: "4px 11px", border: 0, borderRadius: 5, fontSize: 12, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap", background: editBg, color: editFg }}
-                >
-                  에디터
-                </button>
-              </div>
-              {mode === "edit" && (
-                <button
-                  onClick={save}
-                  disabled={pending}
-                  style={{ height: 26, padding: "0 12px", border: 0, borderRadius: 6, background: "var(--accent)", color: "var(--on-accent)", fontSize: 12, fontWeight: 600, cursor: pending ? "default" : "pointer", opacity: pending ? 0.6 : 1 }}
-                >
-                  저장
-                </button>
-              )}
-              {mode === "edit" && format === "md" && (
-                <button
-                  className="wiki-mobile-preview-btn"
-                  onClick={() => setMobilePreviewOpen(true)}
-                  style={{ height: 26, padding: "0 10px", border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel)", color: "var(--ink2)", fontSize: 11.5, cursor: "pointer" }}
-                >
-                  미리보기
-                </button>
-              )}
-              <button
-                onClick={remove}
-                disabled={deleting}
-                title="문서 삭제"
-                style={{ height: 26, padding: "0 10px", border: "1px solid var(--err)", borderRadius: 6, background: "var(--err-soft)", color: "var(--err)", fontSize: 11.5, cursor: deleting ? "default" : "pointer" }}
-              >
-                {deleting ? "삭제 중..." : "삭제"}
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-
       {mode === "view" && (
         <article style={{ padding: "26px 30px", maxWidth: format === "html" ? "none" : 740, overflowX: "auto" }}>
           <h1 style={{ margin: "0 0 16px", fontSize: 23, fontWeight: 600, letterSpacing: "-.02em" }}>{title}</h1>
@@ -135,13 +68,13 @@ export function WikiEditor({ noteId, path, title, format, content, html, updated
         </article>
       )}
 
-      {mode === "edit" && canWrite && format === "html" && (
+      {mode === "edit" && format === "html" && (
         <div style={{ padding: "18px 20px" }}>
-          <WikiHtmlEditor defaultValue={source} onChange={setSource} />
+          <WikiHtmlEditor defaultValue={source} onChange={onSourceChange} />
         </div>
       )}
 
-      {mode === "edit" && canWrite && format === "md" && (
+      {mode === "edit" && format === "md" && (
         <div className="wiki-editor-split" style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)" }}>
           <div style={{ borderRight: "1px solid var(--line)" }}>
             <div style={{ display: "flex", gap: 4, padding: "7px 10px", borderBottom: "1px solid var(--line2)", background: "var(--panel2)" }}>
@@ -160,7 +93,7 @@ export function WikiEditor({ noteId, path, title, format, content, html, updated
             <textarea
               ref={textareaRef}
               value={source}
-              onChange={(e) => setSource(e.target.value)}
+              onChange={(e) => onSourceChange(e.target.value)}
               spellCheck={false}
               style={{ width: "100%", height: 440, border: 0, padding: "16px 18px", resize: "none", outline: "none", background: "var(--panel)", color: "var(--ink2)", fontFamily: "var(--font-mono), monospace", fontSize: 12.5, lineHeight: 1.85 }}
             />
@@ -177,7 +110,7 @@ export function WikiEditor({ noteId, path, title, format, content, html, updated
       {mobilePreviewOpen && (
         <div
           className="wiki-mobile-preview-backdrop"
-          onClick={() => setMobilePreviewOpen(false)}
+          onClick={onCloseMobilePreview}
           style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 80, display: "flex", alignItems: "flex-end" }}
         >
           <div
@@ -187,7 +120,7 @@ export function WikiEditor({ noteId, path, title, format, content, html, updated
             <div style={{ position: "sticky", top: 0, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px", borderBottom: "1px solid var(--line)", background: "var(--panel)" }}>
               <span style={{ fontFamily: "var(--font-mono), monospace", fontSize: 10, fontWeight: 600, letterSpacing: ".1em", color: "var(--ink3)" }}>PREVIEW</span>
               <button
-                onClick={() => setMobilePreviewOpen(false)}
+                onClick={onCloseMobilePreview}
                 style={{ width: 26, height: 26, border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel2)", color: "var(--ink2)", fontSize: 13, cursor: "pointer" }}
               >
                 ✕

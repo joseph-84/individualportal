@@ -277,14 +277,12 @@ select {
     z-index: 55;
   }
 
-  /* File browser / wiki / code editor: fixed-width side columns stack above the content. */
+  /* File browser / code editor: fixed-width side columns stack above the content. */
   .fb-grid,
-  .wiki-grid,
   .editor-grid {
     grid-template-columns: 1fr !important;
   }
-  .fb-tree,
-  .wiki-sidebar {
+  .fb-tree {
     position: static !important;
     max-height: none !important;
     top: auto !important;
