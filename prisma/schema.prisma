@@ -25,6 +25,7 @@ model User {
   shareLinks         ShareLink[]
   apiTokens          ApiToken[]
   favorites          Favorite[]
+  stickyNotes        StickyNote[]
   oauthCodes         OAuthAuthorizationCode[]
   oauthRefreshTokens OAuthRefreshToken[]
   createdAt          DateTime                 @default(now())
@@ -60,6 +61,21 @@ model Todo {
   parent      Todo?     @relation("TodoChildren", fields: [parentId], references: [id], onDelete: Cascade)
   children    Todo[]    @relation("TodoChildren")
   createdAt   DateTime  @default(now())
+}
+
+// 포스트잇 메모: 폴더/제목 없이 보드 위에 자유 배치하는 짧은 메모. x/y는 보드 내 절대 좌표(px),
+// z는 겹쳤을 때의 쌓임 순서(만질 때마다 맨 앞으로, lib/sticky-notes.ts의 nextStickyNoteZ).
+model StickyNote {
+  id        String   @id @default(cuid())
+  content   String   @default("")
+  color     String   @default("yellow")
+  x         Float    @default(0)
+  y         Float    @default(0)
+  z         Int      @default(0)
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Checklist {
