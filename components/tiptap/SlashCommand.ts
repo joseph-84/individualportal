@@ -55,6 +55,15 @@ export const SlashCommand = Extension.create<SlashCommandOptions>({
               // z-index set on a static-positioned descendant (no `position` of its own) has
               // no effect at all and silently does nothing.
               (component.element as HTMLElement).style.zIndex = "9999";
+              // SlashMenuList's colors (var(--panel) etc.) are only defined inside
+              // ThemedShell's `[data-theme]` div (see app/globals.css), not on <html>/<body>.
+              // Mounted straight onto document.body, this element falls outside that scope, so
+              // the variables resolve to nothing and e.g. `background: var(--panel)` computes
+              // to transparent -- note text behind the popup bleeds through. Mirror the
+              // attribute from the editor's own themed ancestor onto this wrapper so its
+              // subtree gets the same custom properties back.
+              const themeHost = props.editor.view.dom.closest("[data-theme]");
+              if (themeHost) (component.element as HTMLElement).setAttribute("data-theme", themeHost.getAttribute("data-theme")!);
               unmount = props.mount(component.element);
             },
             onUpdate: (props) => {
