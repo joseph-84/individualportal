@@ -11,6 +11,8 @@ import {
   setStickyNoteCollapsedAction,
   deleteStickyNoteAction,
 } from "@/app/actions/sticky-notes";
+import { RichDocEditor } from "./RichDocEditor";
+import { MEMO_SLASH_ITEMS } from "./tiptap/items";
 
 interface NoteItem {
   id: string;
@@ -240,41 +242,36 @@ function NoteCard({
       {!note.collapsed && (
         <>
         {editing ? (
-        <textarea
-          autoFocus
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onBlur={() => {
-            setEditing(false);
-            if (text !== note.content) onSaveContent(note.id, text);
-          }}
-          style={{
-            flex: 1,
-            resize: "none",
-            border: 0,
-            background: "transparent",
-            color: palette.ink,
-            fontSize: 13,
-            lineHeight: 1.4,
-            fontFamily: "inherit",
-            outline: "none",
-            userSelect: "text",
-          }}
-        />
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", color: palette.ink, userSelect: "text" }} onPointerDown={(e) => e.stopPropagation()}>
+          <RichDocEditor
+            format="html"
+            defaultValue={text}
+            onChange={setText}
+            onBlur={(html) => {
+              setEditing(false);
+              if (html !== note.content) onSaveContent(note.id, html);
+            }}
+            slashItems={MEMO_SLASH_ITEMS}
+            compact
+            hideToolbar
+            bare
+          />
+        </div>
       ) : (
         <div
+          className="wiki-content"
           style={{
             flex: 1,
             fontSize: 13,
             lineHeight: 1.4,
-            whiteSpace: "pre-wrap",
             wordBreak: "break-word",
             cursor: canWrite ? "text" : "default",
             opacity: text ? 1 : 0.5,
+            color: palette.ink,
+            overflow: "auto",
           }}
-        >
-          {text || "클릭해서 메모 작성..."}
-        </div>
+          dangerouslySetInnerHTML={{ __html: text || "클릭해서 메모 작성..." }}
+        />
         )}
         {canWrite && (
           <div

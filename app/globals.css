@@ -304,26 +304,10 @@ select {
   }
 }
 
-/* Wiki editor (source/preview split, HTML WYSIWYG toolbar): the fixed two-column source+preview
-   grid squeezes both panes unusably narrow on a phone, so below this width the source editor
-   takes the full width and the live preview moves into a bottom-sheet modal (triggered by the
-   .wiki-mobile-preview-btn button, hidden on desktop where the side-by-side preview already
-   does the job). Toolbar buttons flagged .wiki-toolbar-extra (table/align/table-row-col/etc.)
-   are secondary tools that mostly need a mouse+precision anyway -- hide them to keep the
-   toolbar to one row on a narrow screen; the primary formatting buttons stay. */
-.wiki-mobile-preview-btn {
-  display: none;
-}
+/* Rich editor toolbar: buttons flagged .wiki-toolbar-extra (table/align/image/etc.) are
+   secondary tools that mostly need a mouse+precision anyway -- hide them to keep the toolbar
+   to one row on a narrow screen; the primary formatting buttons stay. */
 @media (max-width: 700px) {
-  .wiki-editor-split {
-    grid-template-columns: 1fr !important;
-  }
-  .wiki-preview-pane {
-    display: none !important;
-  }
-  .wiki-mobile-preview-btn {
-    display: inline-flex !important;
-  }
   .wiki-toolbar-extra {
     display: none !important;
   }
