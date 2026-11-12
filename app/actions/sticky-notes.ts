@@ -11,7 +11,7 @@ export async function createStickyNoteAction() {
   const { x, y, color } = await nextStickySpot();
   const z = await nextStickyNoteZ();
   const note = await prisma.stickyNote.create({ data: { x, y, z, color, ownerId: user.id } });
-  await writeAudit(user, "note.create", "포스트잇");
+  await writeAudit(user, "note.create", "메모");
   revalidatePath("/notes");
   return note;
 }
