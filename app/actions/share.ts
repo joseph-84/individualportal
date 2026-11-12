@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/guard";
-import { generateShareToken, type ShareScope } from "@/lib/share";
+import { generateShareToken, type ShareScope, type SharePermission } from "@/lib/share";
 import { writeAudit } from "@/lib/audit";
 
 export async function listShareLinksAction(relPath: string) {
@@ -16,18 +16,29 @@ export interface CreateShareState {
   token?: string;
 }
 
-export async function createShareLinkAction(relPath: string, scope: ShareScope, email?: string): Promise<CreateShareState> {
+export async function createShareLinkAction(
+  relPath: string,
+  scope: ShareScope,
+  email?: string,
+  permission: SharePermission = "read",
+  expiresInDays?: number | null
+): Promise<CreateShareState> {
   const user = await requireUser();
   if (scope !== "email_otp" && scope !== "public") return { error: "잘못된 공개 범위입니다." };
   if (scope === "email_otp") {
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "올바른 이메일 주소를 입력하세요." };
   }
+  if (permission !== "read" && permission !== "write") return { error: "잘못된 권한입니다." };
+  if (expiresInDays != null && (!Number.isFinite(expiresInDays) || expiresInDays <= 0)) {
+    return { error: "잘못된 만료 기간입니다." };
+  }
 
   const token = generateShareToken();
+  const expiresAt = expiresInDays ? new Date(Date.now() + expiresInDays * 86_400_000) : null;
   await prisma.shareLink.create({
-    data: { token, relPath, scope, email: scope === "email_otp" ? email : null, createdById: user.id },
+    data: { token, relPath, scope, email: scope === "email_otp" ? email : null, permission, expiresAt, createdById: user.id },
   });
-  await writeAudit(user, "file.share", relPath, { scope, email: scope === "email_otp" ? email : undefined });
+  await writeAudit(user, "file.share", relPath, { scope, email: scope === "email_otp" ? email : undefined, permission, expiresAt });
   revalidatePath("/files");
   return { token };
 }

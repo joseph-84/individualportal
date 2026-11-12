@@ -255,19 +255,33 @@ export function buildMcpServer(user: CurrentUser): McpServer {
 
   server.registerTool(
     "create_share_link",
-    { title: "파일 공유 링크 생성", description: "파일을 공유하는 링크를 만듭니다. scope=public은 링크를 아는 누구나, scope=email_otp는 지정한 이메일로 매 방문마다 OTP를 보내 본인만 열람.", inputSchema: { path: z.string(), scope: z.enum(["email_otp", "public"]), email: z.string().optional() } },
-    async ({ path: relPath, scope, email }) => {
+    {
+      title: "파일 공유 링크 생성",
+      description:
+        "파일을 공유하는 링크를 만듭니다. scope=public은 링크를 아는 누구나, scope=email_otp는 지정한 이메일로 매 방문마다 OTP를 보내 본인만 열람. permission=write(텍스트·.md·.html 등 문서에만 적용, 이미지/PDF는 항상 읽기전용)이면 방문자가 내용을 수정해 저장할 수 있음 -- public+write 조합은 링크를 아는 누구나 파일을 덮어쓸 수 있다는 뜻이니 주의. expiresInDays를 주면 그만큼 지난 뒤 자동 만료.",
+      inputSchema: {
+        path: z.string(),
+        scope: z.enum(["email_otp", "public"]),
+        email: z.string().optional(),
+        permission: z.enum(["read", "write"]).default("read"),
+        expiresInDays: z.number().int().positive().optional(),
+      },
+    },
+    async ({ path: relPath, scope, email, permission, expiresInDays }) => {
       if (scope === "email_otp" && !email) return err("email_otp 방식은 email이 필요합니다.");
       const token = generateShareToken();
-      await prisma.shareLink.create({ data: { token, relPath, scope, email: scope === "email_otp" ? email : null, createdById: user.id } });
-      await writeAudit(user, "file.share", relPath, { scope, via: "mcp" });
+      const expiresAt = expiresInDays ? new Date(Date.now() + expiresInDays * 86_400_000) : null;
+      await prisma.shareLink.create({
+        data: { token, relPath, scope, email: scope === "email_otp" ? email : null, permission, expiresAt, createdById: user.id },
+      });
+      await writeAudit(user, "file.share", relPath, { scope, permission, expiresAt, via: "mcp" });
       return ok({ token, url: `/share/${token}` });
     }
   );
 
   server.registerTool("list_share_links", { title: "공유 링크 목록", description: "특정 파일의 활성 공유 링크를 조회합니다.", inputSchema: { path: z.string() } }, async ({ path: relPath }) => {
     const links = await prisma.shareLink.findMany({ where: { relPath, revoked: false } });
-    return ok(links.map((l) => ({ id: l.id, token: l.token, scope: l.scope, email: l.email, createdAt: l.createdAt })));
+    return ok(links.map((l) => ({ id: l.id, token: l.token, scope: l.scope, email: l.email, permission: l.permission, expiresAt: l.expiresAt, createdAt: l.createdAt })));
   });
 
   server.registerTool("revoke_share_link", { title: "공유 링크 취소", description: "공유 링크를 취소합니다.", inputSchema: { id: z.string() } }, async ({ id }) => {

@@ -112,6 +112,10 @@ model ShareLink {
   relPath        String
   scope          String // "email_otp" | "public"
   email          String? // required when scope = "email_otp"
+  permission     String     @default("read") // "read" | "write" -- write also requires the
+  // target file to be text-editable (see lib/files.ts's previewKind); images/pdf/binary stay
+  // read-only regardless.
+  expiresAt      DateTime? // null = no expiry
   createdById    String
   createdBy      User       @relation(fields: [createdById], references: [id])
   revoked        Boolean    @default(false)
