@@ -1,0 +1,17 @@
+-- CreateTable
+CREATE TABLE "StickyNote" (
+    "id" TEXT NOT NULL,
+    "content" TEXT NOT NULL DEFAULT '',
+    "color" TEXT NOT NULL DEFAULT 'yellow',
+    "x" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "y" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "z" INTEGER NOT NULL DEFAULT 0,
+    "ownerId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "StickyNote_pkey" PRIMARY KEY ("id")
+);
+
+-- AddForeignKey
+ALTER TABLE "StickyNote" ADD CONSTRAINT "StickyNote_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
