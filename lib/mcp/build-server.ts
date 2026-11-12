@@ -188,58 +188,6 @@ export function buildMcpServer(user: CurrentUser): McpServer {
     }
   );
 
-  // ---------- checklists ----------
-  server.registerTool("list_checklists", { title: "체크리스트 목록", description: "체크리스트 문서 목록을 조회합니다.", inputSchema: { folder: z.string().optional() } }, async ({ folder }) => {
-    const checklists = await prisma.checklist.findMany({ where: folder !== undefined ? { folder } : undefined, orderBy: [{ folder: "asc" }, { title: "asc" }] });
-    return ok(checklists.map((c) => ({ id: c.id, title: c.title, folder: c.folder, updatedAt: c.updatedAt })));
-  });
-
-  server.registerTool("get_checklist", { title: "체크리스트 조회", description: "체크리스트 문서 전체 내용을 조회합니다 (content는 체크박스 목록을 담은 HTML).", inputSchema: { id: z.string() } }, async ({ id }) => {
-    const checklist = await prisma.checklist.findUnique({ where: { id } });
-    if (!checklist) return err("체크리스트를 찾을 수 없습니다.");
-    return ok(checklist);
-  });
-
-  server.registerTool(
-    "create_checklist",
-    {
-      title: "체크리스트 생성",
-      description:
-        "새 체크리스트 문서를 만듭니다. content는 생략하면 빈 문서로 시작합니다 (일반 텍스트 또는 HTML -- 체크박스 목록은 웹 UI의 위지위그 에디터와 동일한 형식). 자연어 요청은 할일/체크리스트/위키 중 어디에 넣을지 애매한 경우가 많으므로," +
-        CONFIRM_NOTE,
-      inputSchema: { title: z.string(), folder: z.string().optional(), content: z.string().optional(), ...CONFIRM_FIELD },
-    },
-    async (args) => {
-      if (args.confirm !== true) {
-        return ok({
-          preview: true,
-          message: `아직 생성되지 않았습니다. 다음 내용으로 체크리스트를 생성하려 합니다: "${args.title}"${args.folder ? ` (폴더: ${args.folder})` : ""}. 사용자에게 먼저 알리고 확인받은 후 confirm:true로 다시 호출하세요.`,
-        });
-      }
-      const checklist = await prisma.checklist.create({ data: { title: args.title, folder: args.folder || "", content: args.content || "", ownerId: user.id } });
-      return ok(checklist);
-    }
-  );
-
-  server.registerTool("update_checklist", { title: "체크리스트 수정", description: "체크리스트 내용을 수정합니다(전체 content 교체).", inputSchema: { id: z.string(), content: z.string() } }, async ({ id, content }) => {
-    const checklist = await prisma.checklist.update({ where: { id }, data: { content } });
-    return ok(checklist);
-  });
-
-  server.registerTool(
-    "delete_checklist",
-    { title: "체크리스트 삭제", description: "체크리스트 문서를 삭제합니다 (되돌릴 수 없음)." + CONFIRM_NOTE, inputSchema: { id: z.string(), ...CONFIRM_FIELD } },
-    async ({ id, confirm }) => {
-      const checklist = await prisma.checklist.findUnique({ where: { id } });
-      if (!checklist) return err("체크리스트를 찾을 수 없습니다.");
-      if (confirm !== true) {
-        return ok({ preview: true, message: `"${checklist.title}" 체크리스트를 삭제하려 합니다. 되돌릴 수 없습니다. 사용자에게 먼저 알리고 확인받은 후 confirm:true로 다시 호출하세요.` });
-      }
-      await prisma.checklist.delete({ where: { id } });
-      return ok({ deleted: id });
-    }
-  );
-
   // ---------- files ----------
   server.registerTool("list_files", { title: "파일 목록", description: "SYNC_FOLDER_PATH 내 폴더 내용을 나열합니다.", inputSchema: { dir: z.string().optional() } }, async ({ dir }) => {
     try {

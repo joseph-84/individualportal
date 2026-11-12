@@ -19,7 +19,6 @@ model User {
   lockedUntil        DateTime?
   tokenVersion       Int                      @default(0)
   todos              Todo[]
-  checklists         Checklist[]
   scriptRuns         ScriptRun[]
   auditLogs          AuditLog[]
   shareLinks         ShareLink[]
@@ -76,17 +75,6 @@ model StickyNote {
   width     Float    @default(170)
   height    Float    @default(150)
   collapsed Boolean  @default(false)
-  ownerId   String
-  owner     User     @relation(fields: [ownerId], references: [id])
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Checklist {
-  id        String   @id @default(cuid())
-  title     String
-  folder    String   @default("")
-  content   String   @default("") // Tiptap task-list HTML, same shape as Todo.description
   ownerId   String
   owner     User     @relation(fields: [ownerId], references: [id])
   createdAt DateTime @default(now())

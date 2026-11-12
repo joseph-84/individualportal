@@ -27,8 +27,8 @@ const BTN_STYLE = (active: boolean): React.CSSProperties => ({
   flex: "none",
 });
 
-/** Rich-text editor shared by the file browser's .md/.html documents, the checklist editor,
- * and sticky-note content. Replaces the old HTML-only WikiHtmlEditor: `format="md"` round-trips
+/** Rich-text editor shared by the file browser's .md/.html documents and sticky-note content.
+ * Replaces the old HTML-only WikiHtmlEditor: `format="md"` round-trips
  * through @tiptap/markdown (editor.getMarkdown()) instead of editor.getHTML(), using the exact
  * same extension set -- @tiptap/extension-table@3.33.1+ ships its own markdown serializer, so
  * tables survive the .md round-trip too, no special-casing needed. Typing "/" opens a block
@@ -107,6 +107,25 @@ export function RichDocEditor({
 
   const inTable = editor.isActive("table");
 
+  let hasTaskItems = false;
+  editor.state.doc.descendants((node) => {
+    if (node.type.name === "taskItem") hasTaskItems = true;
+  });
+
+  const uncheckAll = () => {
+    editor
+      .chain()
+      .command(({ tr, state }) => {
+        state.doc.descendants((node, pos) => {
+          if (node.type.name === "taskItem" && node.attrs.checked) {
+            tr.setNodeMarkup(pos, undefined, { ...node.attrs, checked: false });
+          }
+        });
+        return true;
+      })
+      .run();
+  };
+
   return (
     <div style={bare ? undefined : { border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel)", overflow: "hidden" }}>
       {editable && !hideToolbar && (
@@ -146,6 +165,11 @@ export function RichDocEditor({
           <button type="button" onClick={() => editor.chain().focus().toggleTaskList().run()} style={BTN_STYLE(editor.isActive("taskList"))} title="체크박스">
             ☑ 체크
           </button>
+          {hasTaskItems && (
+            <button type="button" onClick={uncheckAll} style={BTN_STYLE(false)} title="문서 안 체크박스를 모두 해제">
+              ☐ 모두 해제
+            </button>
+          )}
           <button type="button" onClick={() => editor.chain().focus().toggleBlockquote().run()} style={BTN_STYLE(editor.isActive("blockquote"))} title="인용구">
             “ ”
           </button>
