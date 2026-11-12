@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { saveChecklistAction, deleteChecklistAction, toggleChecklistItemAction, resetChecklistAction } from "@/app/actions/checklists";
-import { WikiHtmlEditor } from "./WikiHtmlEditor";
+import { RichDocEditor } from "./RichDocEditor";
 
 interface Props {
   checklistId: string;
@@ -138,7 +138,7 @@ export function ChecklistDoc({ checklistId, path, title, content, html, updatedA
 
       {mode === "edit" && canWrite && (
         <div style={{ padding: "18px 20px" }}>
-          <WikiHtmlEditor defaultValue={source} onChange={setSource} />
+          <RichDocEditor format="html" defaultValue={source} onChange={setSource} />
         </div>
       )}
     </>

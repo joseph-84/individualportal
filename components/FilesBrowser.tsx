@@ -286,13 +286,11 @@ export function FilesBrowser({
   const [rootDragOver, setRootDragOver] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
-  // 문서(.md/.html) 뷰어/에디터 상태 -- WikiEditor가 하던 역할을 여기로 올림.
-  const [docMode, setDocMode] = useState<"view" | "edit">("view");
+  // 문서(.md/.html) 상태 -- 열면 항상 바로 편집 가능(RichDocEditor), 뷰어/에디터 모드 구분 없음.
   const [docSource, setDocSource] = useState("");
   const [lastSavedSource, setLastSavedSource] = useState("");
   const [docPending, setDocPending] = useState(false);
   const [docSavedAt, setDocSavedAt] = useState<string | null>(null);
-  const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false);
 
   const isDoc = selected && (selected.ext === "MD" || selected.ext === "HTML");
 
@@ -315,7 +313,7 @@ export function FilesBrowser({
    * just be discarded by the state resets below, the exact "typed but never saved" bug this
    * was added to fix. */
   const flushIfDirty = async () => {
-    if (selected && docMode === "edit" && canWrite && docSource !== lastSavedSource) {
+    if (selected && canWrite && docSource !== lastSavedSource) {
       await saveDoc();
     }
   };
@@ -324,11 +322,9 @@ export function FilesBrowser({
     await flushIfDirty();
     setSelected(entry);
     setPreview(null);
-    setDocMode("view");
     setDocSource("");
     setLastSavedSource("");
     setDocSavedAt(null);
-    setMobilePreviewOpen(false);
 
     if (entry.ext === "MD" || entry.ext === "HTML") {
       const [renderRes, contentRes] = await Promise.all([
@@ -553,11 +549,11 @@ export function FilesBrowser({
 
   const docDirty = isDoc && docSource !== lastSavedSource;
 
-  // Autosave: 1.2s after the user stops typing in edit mode, save automatically so a save
-  // never depends on remembering to click the button (see flushIfDirty above for the
-  // switch-away/close case, and the beforeunload handler below for leaving the page).
+  // Autosave: 1.2s after the user stops typing, save automatically so a save never depends on
+  // remembering to click the button (see flushIfDirty above for the switch-away/close case,
+  // and the beforeunload handler below for leaving the page).
   useEffect(() => {
-    if (!isDoc || !canWrite || docMode !== "edit" || docSource === lastSavedSource) return;
+    if (!isDoc || !canWrite || docSource === lastSavedSource) return;
     const t = setTimeout(() => {
       saveDoc();
     }, 1200);
@@ -771,41 +767,16 @@ export function FilesBrowser({
               <div style={{ fontSize: 13, fontWeight: 600, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{selected.name}</div>
               {isDoc && canWrite && (
                 <>
-                  <div style={{ display: "flex", padding: 2, gap: 2, border: "1px solid var(--line)", borderRadius: 7, background: "var(--panel2)" }}>
-                    <button
-                      onClick={() => setDocMode("view")}
-                      style={{ padding: "4px 11px", border: 0, borderRadius: 5, fontSize: 12, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap", background: docMode === "view" ? "var(--panel)" : "transparent", color: docMode === "view" ? "var(--ink)" : "var(--ink2)" }}
-                    >
-                      뷰어
-                    </button>
-                    <button
-                      onClick={() => setDocMode("edit")}
-                      style={{ padding: "4px 11px", border: 0, borderRadius: 5, fontSize: 12, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap", background: docMode === "edit" ? "var(--panel)" : "transparent", color: docMode === "edit" ? "var(--ink)" : "var(--ink2)" }}
-                    >
-                      에디터
-                    </button>
-                  </div>
                   <span style={{ fontSize: 11.5, color: docPending ? "var(--ink3)" : docDirty ? "var(--warn)" : "var(--ink3)" }}>
                     {docPending ? "저장 중..." : docDirty ? "저장 안 됨" : docSavedAt ? `${docSavedAt} 저장됨` : `최종 수정 ${new Date(selected.mtime).toLocaleString("ko-KR")}`}
                   </span>
-                  {docMode === "edit" && (
-                    <button
-                      onClick={saveDoc}
-                      disabled={docPending}
-                      style={{ height: 26, padding: "0 12px", border: 0, borderRadius: 6, background: "var(--accent)", color: "var(--on-accent)", fontSize: 12, fontWeight: 600, cursor: docPending ? "default" : "pointer", opacity: docPending ? 0.6 : 1 }}
-                    >
-                      저장
-                    </button>
-                  )}
-                  {docMode === "edit" && selected.ext === "MD" && (
-                    <button
-                      className="wiki-mobile-preview-btn"
-                      onClick={() => setMobilePreviewOpen(true)}
-                      style={{ height: 26, padding: "0 10px", border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel)", color: "var(--ink2)", fontSize: 11.5, cursor: "pointer" }}
-                    >
-                      미리보기
-                    </button>
-                  )}
+                  <button
+                    onClick={saveDoc}
+                    disabled={docPending}
+                    style={{ height: 26, padding: "0 12px", border: 0, borderRadius: 6, background: "var(--accent)", color: "var(--on-accent)", fontSize: 12, fontWeight: 600, cursor: docPending ? "default" : "pointer", opacity: docPending ? 0.6 : 1 }}
+                  >
+                    저장
+                  </button>
                 </>
               )}
               <button
@@ -860,14 +831,12 @@ export function FilesBrowser({
             {!preview && <div style={{ padding: 24, fontSize: 12.5, color: "var(--ink3)" }}>불러오는 중...</div>}
             {preview?.kind === "doc" && (
               <DocEditor
-                mode={canWrite ? docMode : "view"}
+                canWrite={canWrite}
                 title={selected.name.replace(/\.(md|html)$/i, "")}
                 format={selected.ext.toLowerCase()}
                 html={preview.html || ""}
                 source={docSource}
                 onSourceChange={setDocSource}
-                mobilePreviewOpen={mobilePreviewOpen}
-                onCloseMobilePreview={() => setMobilePreviewOpen(false)}
               />
             )}
             {preview?.kind === "text" && (
