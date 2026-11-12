@@ -8,13 +8,24 @@ interface ShareLinkItem {
   token: string;
   scope: string;
   email: string | null;
+  permission: string;
+  expiresAt: string | null;
   createdAt: string;
 }
+
+const EXPIRY_OPTIONS: { label: string; days: number | null }[] = [
+  { label: "만료 안 함", days: null },
+  { label: "1일", days: 1 },
+  { label: "7일", days: 7 },
+  { label: "30일", days: 30 },
+];
 
 export function ShareDialog({ relPath, onClose }: { relPath: string; onClose: () => void }) {
   const [links, setLinks] = useState<ShareLinkItem[] | null>(null);
   const [scope, setScope] = useState<"email_otp" | "public">("email_otp");
   const [email, setEmail] = useState("");
+  const [permission, setPermission] = useState<"read" | "write">("read");
+  const [expiryDays, setExpiryDays] = useState<number | null>(null);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const origin = typeof window !== "undefined" ? window.location.origin : "";
@@ -22,7 +33,17 @@ export function ShareDialog({ relPath, onClose }: { relPath: string; onClose: ()
   const load = () => {
     startTransition(async () => {
       const res = await listShareLinksAction(relPath);
-      setLinks(res.map((l) => ({ id: l.id, token: l.token, scope: l.scope, email: l.email, createdAt: l.createdAt.toString() })));
+      setLinks(
+        res.map((l) => ({
+          id: l.id,
+          token: l.token,
+          scope: l.scope,
+          email: l.email,
+          permission: l.permission,
+          expiresAt: l.expiresAt ? l.expiresAt.toString() : null,
+          createdAt: l.createdAt.toString(),
+        }))
+      );
     });
   };
 
@@ -31,7 +52,7 @@ export function ShareDialog({ relPath, onClose }: { relPath: string; onClose: ()
   const create = () => {
     setError(null);
     startTransition(async () => {
-      const res = await createShareLinkAction(relPath, scope, scope === "email_otp" ? email : undefined);
+      const res = await createShareLinkAction(relPath, scope, scope === "email_otp" ? email : undefined, permission, expiryDays);
       if (res.error) setError(res.error);
       else setEmail("");
       load();
@@ -77,6 +98,32 @@ export function ShareDialog({ relPath, onClose }: { relPath: string; onClose: ()
               style={{ height: 32, padding: "0 10px", border: "1px solid var(--line)", borderRadius: 7, background: "var(--panel2)", color: "var(--ink)", fontSize: 12.5 }}
             />
           )}
+          <div style={{ display: "flex", gap: 8 }}>
+            <select
+              value={permission}
+              onChange={(e) => setPermission(e.target.value as "read" | "write")}
+              style={{ flex: 1, height: 32, border: "1px solid var(--line)", borderRadius: 7, background: "var(--panel2)", color: "var(--ink)", fontSize: 12.5 }}
+            >
+              <option value="read">읽기전용</option>
+              <option value="write">읽기/쓰기 (텍스트·문서 수정 허용)</option>
+            </select>
+            <select
+              value={expiryDays ?? ""}
+              onChange={(e) => setExpiryDays(e.target.value === "" ? null : Number(e.target.value))}
+              style={{ flex: 1, height: 32, border: "1px solid var(--line)", borderRadius: 7, background: "var(--panel2)", color: "var(--ink)", fontSize: 12.5 }}
+            >
+              {EXPIRY_OPTIONS.map((o) => (
+                <option key={o.label} value={o.days ?? ""}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          {permission === "write" && (
+            <div style={{ fontSize: 11, color: "var(--warn)" }}>
+              쓰기 권한은 텍스트/문서(.md·.html·.txt 등) 파일만 적용되며, 전체 공개로 만들면 링크를 아는 누구나 내용을 수정할 수 있습니다.
+            </div>
+          )}
           <button onClick={create} disabled={pending} style={{ height: 32, padding: "0 14px", border: 0, borderRadius: 7, background: "var(--accent)", color: "var(--on-accent)", fontSize: 12.5, fontWeight: 600, cursor: pending ? "default" : "pointer" }}>
             링크 생성
           </button>
@@ -94,7 +141,15 @@ export function ShareDialog({ relPath, onClose }: { relPath: string; onClose: ()
               <span style={{ fontSize: 9.5, fontWeight: 700, padding: "1px 6px", borderRadius: 4, background: l.scope === "public" ? "var(--warn-soft)" : "var(--ok-soft)", color: l.scope === "public" ? "var(--warn)" : "var(--ok)", flex: "none" }}>
                 {l.scope === "public" ? "전체공개" : "OTP"}
               </span>
+              {l.permission === "write" && (
+                <span style={{ fontSize: 9.5, fontWeight: 700, padding: "1px 6px", borderRadius: 4, background: "var(--err-soft)", color: "var(--err)", flex: "none" }}>쓰기</span>
+              )}
               {l.email && <span style={{ fontSize: 11, color: "var(--ink3)", flex: "none" }}>{l.email}</span>}
+              {l.expiresAt && (
+                <span style={{ fontSize: 10.5, color: new Date(l.expiresAt) <= new Date() ? "var(--err)" : "var(--ink3)", flex: "none" }}>
+                  {new Date(l.expiresAt) <= new Date() ? "만료됨" : `~${new Date(l.expiresAt).toLocaleDateString()}`}
+                </span>
+              )}
               <span style={{ flex: 1, minWidth: 100, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 11.5, fontFamily: "var(--font-mono), monospace", color: "var(--ink2)" }}>
                 /share/{l.token}
               </span>

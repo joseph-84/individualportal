@@ -19,6 +19,7 @@ const ACTION_LABEL: Record<string, string> = {
   "file.delete": "파일 삭제",
   "file.rename": "파일 이름변경/이동",
   "file.copy": "파일 복사",
+  "file.share_edit": "공유 링크로 외부 편집",
 };
 
 export default async function AuditLogPage() {

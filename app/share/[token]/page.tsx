@@ -2,16 +2,10 @@ import { cookies } from "next/headers";
 import path from "node:path";
 import { prisma } from "@/lib/prisma";
 import { shareAccessCookieName, verifyShareAccessToken } from "@/lib/share-otp-auth";
+import { isShareLinkUsable, maskEmail } from "@/lib/share";
 import { previewKind } from "@/lib/files";
 import { ShareOtpGate } from "@/components/ShareOtpGate";
 import { ShareViewer } from "@/components/ShareViewer";
-
-function maskEmail(email: string) {
-  const [user, domain] = email.split("@");
-  if (!domain) return email;
-  const visible = user.slice(0, Math.min(2, user.length));
-  return `${visible}${"*".repeat(Math.max(1, user.length - visible.length))}@${domain}`;
-}
 
 export default async function SharePage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
@@ -40,12 +34,14 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
   // a much wider card so it renders at its intended desktop width.
   const wideCardStyle: React.CSSProperties = { ...cardStyle, maxWidth: 1180 };
 
-  if (!link || link.revoked) {
+  if (!link || !isShareLinkUsable(link)) {
     return (
       <div style={shellStyle}>
         <div style={cardStyle}>
           <h1 style={{ fontSize: 16, margin: "0 0 8px" }}>링크를 찾을 수 없습니다</h1>
-          <p style={{ fontSize: 13, color: "#57534d" }}>이 공유 링크는 취소되었거나 존재하지 않습니다.</p>
+          <p style={{ fontSize: 13, color: "#57534d" }}>
+            {link && link.expiresAt && link.expiresAt <= new Date() ? "이 공유 링크는 만료되었습니다." : "이 공유 링크는 취소되었거나 존재하지 않습니다."}
+          </p>
         </div>
       </div>
     );
@@ -54,12 +50,13 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
   const ext = path.extname(link.relPath).replace(".", "").toUpperCase();
   const kind = previewKind(ext);
   const fileName = path.basename(link.relPath);
+  const editable = link.permission === "write" && (kind === "html" || kind === "text");
 
   if (link.scope === "public") {
     return (
       <div style={shellStyle}>
         <div style={kind === "html" ? wideCardStyle : cardStyle}>
-          <ShareViewer token={token} fileName={fileName} kind={kind} />
+          <ShareViewer token={token} fileName={fileName} kind={kind} ext={ext} editable={editable} />
         </div>
       </div>
     );
@@ -74,7 +71,7 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
     return (
       <div style={shellStyle}>
         <div style={kind === "html" ? wideCardStyle : cardStyle}>
-          <ShareViewer token={token} fileName={fileName} kind={kind} />
+          <ShareViewer token={token} fileName={fileName} kind={kind} ext={ext} editable={editable} />
         </div>
       </div>
     );

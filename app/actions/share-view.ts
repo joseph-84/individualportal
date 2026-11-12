@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
-import { generateOtpCode } from "@/lib/share";
+import { generateOtpCode, isShareLinkUsable } from "@/lib/share";
 import { sendOtpEmail, MailerNotConfiguredError } from "@/lib/mailer";
 import { createShareAccessToken, shareAccessCookieName, SHARE_ACCESS_MAX_AGE } from "@/lib/share-otp-auth";
 import path from "node:path";
@@ -21,7 +21,7 @@ export interface RequestOtpState {
 
 export async function requestShareOtpAction(token: string): Promise<RequestOtpState> {
   const link = await prisma.shareLink.findUnique({ where: { token } });
-  if (!link || link.revoked || link.scope !== "email_otp" || !link.email) {
+  if (!link || !isShareLinkUsable(link) || link.scope !== "email_otp" || !link.email) {
     return { error: "유효하지 않은 공유 링크입니다." };
   }
 
@@ -54,7 +54,7 @@ export interface VerifyOtpState {
 
 export async function verifyShareOtpAction(token: string, code: string): Promise<VerifyOtpState> {
   const link = await prisma.shareLink.findUnique({ where: { token } });
-  if (!link || link.revoked || link.scope !== "email_otp") {
+  if (!link || !isShareLinkUsable(link) || link.scope !== "email_otp") {
     return { error: "유효하지 않은 공유 링크입니다." };
   }
 
