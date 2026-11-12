@@ -43,7 +43,7 @@ const SlashMenuList = forwardRef<SlashMenuHandle, { items: SlashMenuItem[]; comm
 
     if (items.length === 0) {
       return (
-        <div style={{ zIndex: 9999, padding: "8px 12px", fontSize: 12.5, color: "var(--ink3)", background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 8, boxShadow: "0 8px 20px rgba(0,0,0,.18)" }}>
+        <div style={{ padding: "8px 12px", fontSize: 12.5, color: "var(--ink3)", background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 8, boxShadow: "0 8px 20px rgba(0,0,0,.18)" }}>
           일치하는 항목이 없습니다
         </div>
       );
@@ -52,7 +52,6 @@ const SlashMenuList = forwardRef<SlashMenuHandle, { items: SlashMenuItem[]; comm
     return (
       <div
         style={{
-          zIndex: 9999,
           display: "flex",
           flexDirection: "column",
           gap: 1,

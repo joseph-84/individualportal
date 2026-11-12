@@ -48,6 +48,13 @@ export const SlashCommand = Extension.create<SlashCommandOptions>({
                 editor: props.editor,
                 props: { items: props.items, command: props.command },
               });
+              // z-index must go on this wrapper node, not on anything SlashMenuList renders
+              // inside it: this is the element @tiptap/suggestion actually appends to
+              // document.body and absolutely-positions via Floating UI, so it's the one that
+              // competes in stacking order against things like a sticky note's z-index -- a
+              // z-index set on a static-positioned descendant (no `position` of its own) has
+              // no effect at all and silently does nothing.
+              (component.element as HTMLElement).style.zIndex = "9999";
               unmount = props.mount(component.element);
             },
             onUpdate: (props) => {
