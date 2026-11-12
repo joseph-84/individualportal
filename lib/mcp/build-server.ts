@@ -425,14 +425,14 @@ export function buildMcpServer(user: CurrentUser): McpServer {
   );
 
   // ---------- sticky notes ----------
-  server.registerTool("list_notes", { title: "포스트잇 목록", description: "포스트잇 메모 목록을 조회합니다(쌓임 순서).", inputSchema: {} }, async () => {
+  server.registerTool("list_notes", { title: "메모 목록", description: "메모 목록을 조회합니다(쌓임 순서).", inputSchema: {} }, async () => {
     const notes = await prisma.stickyNote.findMany({ orderBy: { z: "asc" } });
     return ok(notes);
   });
 
   server.registerTool(
     "create_note",
-    { title: "포스트잇 추가", description: "새 포스트잇 메모를 추가합니다(보드에 빈 자리를 찾아 배치).", inputSchema: { content: z.string().optional(), color: z.string().optional() } },
+    { title: "메모 추가", description: "새 메모를 추가합니다(보드에 빈 자리를 찾아 배치).", inputSchema: { content: z.string().optional(), color: z.string().optional() } },
     async (args) => {
       const spot = await nextStickySpot();
       const z = await nextStickyNoteZ();
@@ -446,8 +446,8 @@ export function buildMcpServer(user: CurrentUser): McpServer {
   server.registerTool(
     "update_note",
     {
-      title: "포스트잇 수정",
-      description: "포스트잇의 제목·내용·색상·위치·크기·접힘 상태를 수정합니다.",
+      title: "메모 수정",
+      description: "메모의 제목·내용·색상·위치·크기·접힘 상태를 수정합니다.",
       inputSchema: {
         id: z.string(),
         title: z.string().optional(),
@@ -468,12 +468,12 @@ export function buildMcpServer(user: CurrentUser): McpServer {
 
   server.registerTool(
     "delete_note",
-    { title: "포스트잇 삭제", description: "포스트잇 메모를 삭제합니다 (되돌릴 수 없음)." + CONFIRM_NOTE, inputSchema: { id: z.string(), ...CONFIRM_FIELD } },
+    { title: "메모 삭제", description: "메모를 삭제합니다 (되돌릴 수 없음)." + CONFIRM_NOTE, inputSchema: { id: z.string(), ...CONFIRM_FIELD } },
     async ({ id, confirm }) => {
       const note = await prisma.stickyNote.findUnique({ where: { id } });
-      if (!note) return err("포스트잇을 찾을 수 없습니다.");
+      if (!note) return err("메모를 찾을 수 없습니다.");
       if (confirm !== true) {
-        return ok({ preview: true, message: `포스트잇 "${(note.content || "(빈 메모)").slice(0, 30)}"을(를) 삭제하려 합니다. 사용자에게 먼저 알리고 확인받은 후 confirm:true로 다시 호출하세요.` });
+        return ok({ preview: true, message: `메모 "${(note.content || "(빈 메모)").slice(0, 30)}"을(를) 삭제하려 합니다. 사용자에게 먼저 알리고 확인받은 후 confirm:true로 다시 호출하세요.` });
       }
       await prisma.stickyNote.delete({ where: { id } });
       return ok({ deleted: id });
