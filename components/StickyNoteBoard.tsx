@@ -88,9 +88,20 @@ function NoteCard({
   };
   const onPointerUp = (e: PointerEvent<HTMLDivElement>) => {
     if (!dragInfo.current) return;
+    const didMove = movedRef.current;
     dragInfo.current = null;
+    movedRef.current = false;
     setDragging(false);
-    if (movedRef.current) onMove(note.id, pos.x, pos.y);
+    if (didMove) {
+      // Dragged: persist the new position. A plain click (no movement) never reaches here as
+      // a drag, so it falls through to opening the editor below -- pointer capture (needed so
+      // drag keeps tracking once the cursor leaves the card) retargets the native "click" event
+      // to this element too, which is why editing can't be triggered by a separate onClick on
+      // the inner content div.
+      onMove(note.id, pos.x, pos.y);
+    } else if (canWrite && !editing) {
+      setEditing(true);
+    }
   };
 
   return (
@@ -173,13 +184,6 @@ function NoteCard({
         />
       ) : (
         <div
-          onClick={() => {
-            if (movedRef.current) {
-              movedRef.current = false;
-              return;
-            }
-            if (canWrite) setEditing(true);
-          }}
           style={{
             flex: 1,
             fontSize: 13,
