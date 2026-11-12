@@ -4,19 +4,31 @@ import { useEffect, useRef, useState, useTransition, type PointerEvent } from "r
 import {
   createStickyNoteAction,
   updateStickyNoteContentAction,
+  updateStickyNoteTitleAction,
   setStickyNoteColorAction,
   moveStickyNoteAction,
+  resizeStickyNoteAction,
+  setStickyNoteCollapsedAction,
   deleteStickyNoteAction,
 } from "@/app/actions/sticky-notes";
 
 interface NoteItem {
   id: string;
+  title: string;
   content: string;
   color: string;
   x: number;
   y: number;
   z: number;
+  width: number;
+  height: number;
+  collapsed: boolean;
 }
+
+const MIN_WIDTH = 120;
+const MIN_HEIGHT = 90;
+const MAX_WIDTH = 420;
+const MAX_HEIGHT = 420;
 
 // Fixed, real-sticky-note-ish colors -- deliberately not theme tokens, since a postit's color
 // is part of its identity and shouldn't flip with light/dark mode. Keep names in sync with
@@ -45,7 +57,10 @@ function NoteCard({
   onDragStart,
   onMove,
   onSaveContent,
+  onSaveTitle,
   onSetColor,
+  onResize,
+  onToggleCollapse,
   onDelete,
 }: {
   note: NoteItem;
@@ -54,25 +69,34 @@ function NoteCard({
   onDragStart: (id: string) => void;
   onMove: (id: string, x: number, y: number) => void;
   onSaveContent: (id: string, content: string) => void;
+  onSaveTitle: (id: string, title: string) => void;
   onSetColor: (id: string, color: string) => void;
+  onResize: (id: string, width: number, height: number) => void;
+  onToggleCollapse: (id: string, collapsed: boolean) => void;
   onDelete: (id: string) => void;
 }) {
   const [pos, setPos] = useState({ x: note.x, y: note.y });
+  const [dims, setDims] = useState({ width: note.width, height: note.height });
   const [dragging, setDragging] = useState(false);
+  const [resizing, setResizing] = useState(false);
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(note.content);
+  const [title, setTitle] = useState(note.title);
   const dragInfo = useRef<{ sx: number; sy: number; ox: number; oy: number } | null>(null);
+  const resizeInfo = useRef<{ sx: number; sy: number; ow: number; oh: number } | null>(null);
   const movedRef = useRef(false);
 
   useEffect(() => setPos({ x: note.x, y: note.y }), [note.x, note.y]);
+  useEffect(() => setDims({ width: note.width, height: note.height }), [note.width, note.height]);
   useEffect(() => setText(note.content), [note.content]);
+  useEffect(() => setTitle(note.title), [note.title]);
 
   const palette = PALETTE[note.color] ?? PALETTE.yellow;
   const rotate = rotationFor(note.id);
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     if (!canWrite) return;
-    if ((e.target as HTMLElement).closest("textarea, button")) return;
+    if ((e.target as HTMLElement).closest("textarea, button, input")) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     movedRef.current = false;
     dragInfo.current = { sx: e.clientX, sy: e.clientY, ox: pos.x, oy: pos.y };
@@ -104,6 +128,29 @@ function NoteCard({
     }
   };
 
+  const onResizePointerDown = (e: PointerEvent<HTMLDivElement>) => {
+    if (!canWrite) return;
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    resizeInfo.current = { sx: e.clientX, sy: e.clientY, ow: dims.width, oh: dims.height };
+    setResizing(true);
+  };
+  const onResizePointerMove = (e: PointerEvent<HTMLDivElement>) => {
+    if (!resizeInfo.current) return;
+    e.stopPropagation();
+    const { sx, sy, ow, oh } = resizeInfo.current;
+    const width = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, ow + (e.clientX - sx)));
+    const height = Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, oh + (e.clientY - sy)));
+    setDims({ width, height });
+  };
+  const onResizePointerUp = (e: PointerEvent<HTMLDivElement>) => {
+    if (!resizeInfo.current) return;
+    e.stopPropagation();
+    resizeInfo.current = null;
+    setResizing(false);
+    onResize(note.id, dims.width, dims.height);
+  };
+
   return (
     <div
       onPointerDown={onPointerDown}
@@ -113,24 +160,45 @@ function NoteCard({
         position: "absolute",
         left: pos.x,
         top: pos.y,
-        width: 170,
-        minHeight: 150,
+        width: dims.width,
+        minHeight: note.collapsed ? undefined : dims.height,
         padding: "7px 9px 10px",
         borderRadius: 3,
         background: palette.bg,
         color: palette.ink,
-        boxShadow: dragging ? "0 10px 20px rgba(0,0,0,.28)" : "0 3px 8px rgba(0,0,0,.18)",
+        boxShadow: dragging || resizing ? "0 10px 20px rgba(0,0,0,.28)" : "0 3px 8px rgba(0,0,0,.18)",
         transform: `rotate(${rotate}deg)${dragging ? " scale(1.03)" : ""}`,
-        transition: dragging ? "none" : "box-shadow .15s, transform .15s",
+        transition: dragging || resizing ? "none" : "box-shadow .15s, transform .15s",
         cursor: canWrite ? (dragging ? "grabbing" : "grab") : "default",
         zIndex: front ? 1000 : note.z,
         display: "flex",
         flexDirection: "column",
-        gap: 6,
+        gap: 4,
         touchAction: "none",
         userSelect: "none",
       }}
     >
+      <input
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        onBlur={() => {
+          if (title !== note.title) onSaveTitle(note.id, title);
+        }}
+        placeholder="제목 없음"
+        disabled={!canWrite}
+        style={{
+          border: 0,
+          background: "transparent",
+          color: palette.ink,
+          fontSize: 13,
+          fontWeight: 700,
+          outline: "none",
+          padding: 0,
+          width: "100%",
+          flex: "none",
+          cursor: canWrite ? "text" : "default",
+        }}
+      />
       <div style={{ display: "flex", alignItems: "center", gap: 4, flex: "none" }}>
         {canWrite &&
           COLOR_ORDER.map((c) => (
@@ -152,15 +220,26 @@ function NoteCard({
           ))}
         {canWrite && (
           <button
+            onClick={() => onToggleCollapse(note.id, !note.collapsed)}
+            title={note.collapsed ? "펼치기" : "접기"}
+            style={{ marginLeft: "auto", border: 0, background: "transparent", color: palette.ink, opacity: 0.55, cursor: "pointer", fontSize: 11, padding: 0, lineHeight: 1 }}
+          >
+            {note.collapsed ? "▸" : "▾"}
+          </button>
+        )}
+        {canWrite && (
+          <button
             onClick={() => onDelete(note.id)}
             title="삭제"
-            style={{ marginLeft: "auto", border: 0, background: "transparent", color: palette.ink, opacity: 0.55, cursor: "pointer", fontSize: 13, padding: 0, lineHeight: 1 }}
+            style={{ border: 0, background: "transparent", color: palette.ink, opacity: 0.55, cursor: "pointer", fontSize: 13, padding: 0, lineHeight: 1 }}
           >
             ✕
           </button>
         )}
       </div>
-      {editing ? (
+      {!note.collapsed && (
+        <>
+        {editing ? (
         <textarea
           autoFocus
           value={text}
@@ -196,6 +275,31 @@ function NoteCard({
         >
           {text || "클릭해서 메모 작성..."}
         </div>
+        )}
+        {canWrite && (
+          <div
+            onPointerDown={onResizePointerDown}
+            onPointerMove={onResizePointerMove}
+            onPointerUp={onResizePointerUp}
+            title="크기 조절"
+            style={{
+              position: "absolute",
+              right: 2,
+              bottom: 2,
+              width: 14,
+              height: 14,
+              lineHeight: 1,
+              fontSize: 11,
+              opacity: 0.45,
+              cursor: "nwse-resize",
+              touchAction: "none",
+              userSelect: "none",
+            }}
+          >
+            ⌟
+          </div>
+        )}
+        </>
       )}
     </div>
   );
@@ -208,7 +312,10 @@ export function StickyNoteBoard({ canWrite, notes }: { canWrite: boolean; notes:
   const add = () => startTransition(() => void createStickyNoteAction());
   const move = (id: string, x: number, y: number) => startTransition(() => void moveStickyNoteAction(id, x, y));
   const saveContent = (id: string, content: string) => startTransition(() => void updateStickyNoteContentAction(id, content));
+  const saveTitle = (id: string, title: string) => startTransition(() => void updateStickyNoteTitleAction(id, title));
   const setColor = (id: string, color: string) => startTransition(() => void setStickyNoteColorAction(id, color));
+  const resize = (id: string, width: number, height: number) => startTransition(() => void resizeStickyNoteAction(id, width, height));
+  const toggleCollapse = (id: string, collapsed: boolean) => startTransition(() => void setStickyNoteCollapsedAction(id, collapsed));
   const remove = (id: string) => {
     if (!confirm("이 메모를 삭제할까요?")) return;
     startTransition(() => void deleteStickyNoteAction(id));
@@ -260,7 +367,10 @@ export function StickyNoteBoard({ canWrite, notes }: { canWrite: boolean; notes:
             onDragStart={setFrontId}
             onMove={move}
             onSaveContent={saveContent}
+            onSaveTitle={saveTitle}
             onSetColor={setColor}
+            onResize={resize}
+            onToggleCollapse={toggleCollapse}
             onDelete={remove}
           />
         ))}

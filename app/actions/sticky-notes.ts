@@ -28,6 +28,25 @@ export async function setStickyNoteColorAction(id: string, color: string) {
   revalidatePath("/notes");
 }
 
+export async function updateStickyNoteTitleAction(id: string, title: string) {
+  await requirePerm("notes", 2);
+  await prisma.stickyNote.update({ where: { id }, data: { title } });
+  revalidatePath("/notes");
+}
+
+/** Resize-handle drag end: persists the dropped width/height (already clamped client-side). */
+export async function resizeStickyNoteAction(id: string, width: number, height: number) {
+  await requirePerm("notes", 2);
+  await prisma.stickyNote.update({ where: { id }, data: { width, height } });
+  revalidatePath("/notes");
+}
+
+export async function setStickyNoteCollapsedAction(id: string, collapsed: boolean) {
+  await requirePerm("notes", 2);
+  await prisma.stickyNote.update({ where: { id }, data: { collapsed } });
+  revalidatePath("/notes");
+}
+
 /** Drag end: persists the dropped position and bumps the note to the front of the overlap
  * stack, the same "picking it up brings it to the top" behavior as a real sticky note. */
 export async function moveStickyNoteAction(id: string, x: number, y: number) {
