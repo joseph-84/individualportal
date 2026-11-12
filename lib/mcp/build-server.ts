@@ -447,8 +447,18 @@ export function buildMcpServer(user: CurrentUser): McpServer {
     "update_note",
     {
       title: "포스트잇 수정",
-      description: "포스트잇의 내용·색상·위치를 수정합니다.",
-      inputSchema: { id: z.string(), content: z.string().optional(), color: z.string().optional(), x: z.number().optional(), y: z.number().optional() },
+      description: "포스트잇의 제목·내용·색상·위치·크기·접힘 상태를 수정합니다.",
+      inputSchema: {
+        id: z.string(),
+        title: z.string().optional(),
+        content: z.string().optional(),
+        color: z.string().optional(),
+        x: z.number().optional(),
+        y: z.number().optional(),
+        width: z.number().optional(),
+        height: z.number().optional(),
+        collapsed: z.boolean().optional(),
+      },
     },
     async ({ id, ...rest }) => {
       const note = await prisma.stickyNote.update({ where: { id }, data: rest });

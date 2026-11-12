@@ -10,7 +10,18 @@ export default async function NotesPage() {
   return (
     <StickyNoteBoard
       canWrite={level === 2}
-      notes={notes.map((n) => ({ id: n.id, content: n.content, color: n.color, x: n.x, y: n.y, z: n.z }))}
+      notes={notes.map((n) => ({
+        id: n.id,
+        title: n.title,
+        content: n.content,
+        color: n.color,
+        x: n.x,
+        y: n.y,
+        z: n.z,
+        width: n.width,
+        height: n.height,
+        collapsed: n.collapsed,
+      }))}
     />
   );
 }

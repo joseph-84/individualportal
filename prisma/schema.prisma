@@ -67,11 +67,15 @@ model Todo {
 // z는 겹쳤을 때의 쌓임 순서(만질 때마다 맨 앞으로, lib/sticky-notes.ts의 nextStickyNoteZ).
 model StickyNote {
   id        String   @id @default(cuid())
+  title     String   @default("")
   content   String   @default("")
   color     String   @default("yellow")
   x         Float    @default(0)
   y         Float    @default(0)
   z         Int      @default(0)
+  width     Float    @default(170)
+  height    Float    @default(150)
+  collapsed Boolean  @default(false)
   ownerId   String
   owner     User     @relation(fields: [ownerId], references: [id])
   createdAt DateTime @default(now())
