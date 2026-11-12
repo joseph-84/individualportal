@@ -286,9 +286,10 @@ export function FilesBrowser({
   const [rootDragOver, setRootDragOver] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
-  // 문서(.md/.html, 디스크든 지식베이스든) 뷰어/에디터 상태 -- WikiEditor가 하던 역할을 여기로 올림.
+  // 문서(.md/.html) 뷰어/에디터 상태 -- WikiEditor가 하던 역할을 여기로 올림.
   const [docMode, setDocMode] = useState<"view" | "edit">("view");
   const [docSource, setDocSource] = useState("");
+  const [lastSavedSource, setLastSavedSource] = useState("");
   const [docPending, setDocPending] = useState(false);
   const [docSavedAt, setDocSavedAt] = useState<string | null>(null);
   const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false);
@@ -309,11 +310,23 @@ export function FilesBrowser({
     return list;
   }, []);
 
-  const loadPreview = useCallback(async (entry: FileEntry) => {
+  /** Autosave flush: if the currently open doc has unsaved edits, save it before switching
+   * away (tree click, folder navigation, closing the preview) -- otherwise those edits would
+   * just be discarded by the state resets below, the exact "typed but never saved" bug this
+   * was added to fix. */
+  const flushIfDirty = async () => {
+    if (selected && docMode === "edit" && canWrite && docSource !== lastSavedSource) {
+      await saveDoc();
+    }
+  };
+
+  const loadPreview = async (entry: FileEntry) => {
+    await flushIfDirty();
     setSelected(entry);
     setPreview(null);
     setDocMode("view");
     setDocSource("");
+    setLastSavedSource("");
     setDocSavedAt(null);
     setMobilePreviewOpen(false);
 
@@ -326,7 +339,11 @@ export function FilesBrowser({
         const data = await renderRes.json();
         setPreview({ kind: "doc", html: data.html });
       }
-      if (contentRes.ok) setDocSource(await contentRes.text());
+      if (contentRes.ok) {
+        const text = await contentRes.text();
+        setDocSource(text);
+        setLastSavedSource(text);
+      }
       return;
     }
 
@@ -338,7 +355,7 @@ export function FilesBrowser({
       const text = await res.text();
       setPreview({ kind: "text", text: text.slice(0, 200_000) });
     } else setPreview({ kind: "binary" });
-  }, []);
+  };
 
   const selectByPath = useCallback(
     async (path: string) => {
@@ -363,6 +380,7 @@ export function FilesBrowser({
   }, []);
 
   const loadDir = async (nextDir: string) => {
+    await flushIfDirty();
     setLoading(true);
     setSelected(null);
     setPreview(null);
@@ -510,16 +528,19 @@ export function FilesBrowser({
 
   const saveDoc = async () => {
     if (!selected) return;
+    const contentToSave = docSource;
+    const path = selected.relPath;
     setDocPending(true);
     const res = await fetch("/api/files", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "write", path: selected.relPath, content: docSource }),
+      body: JSON.stringify({ action: "write", path, content: contentToSave }),
     });
     setDocPending(false);
     if (res.ok) {
       setDocSavedAt(new Date().toLocaleTimeString("ko-KR"));
-      const renderRes = await fetch(`/api/files/render?path=${encodeURIComponent(selected.relPath)}`);
+      setLastSavedSource(contentToSave);
+      const renderRes = await fetch(`/api/files/render?path=${encodeURIComponent(path)}`);
       if (renderRes.ok) {
         const data = await renderRes.json();
         setPreview((p) => (p ? { ...p, html: data.html } : p));
@@ -529,6 +550,30 @@ export function FilesBrowser({
       alert(data.error || "저장할 수 없습니다.");
     }
   };
+
+  const docDirty = isDoc && docSource !== lastSavedSource;
+
+  // Autosave: 1.2s after the user stops typing in edit mode, save automatically so a save
+  // never depends on remembering to click the button (see flushIfDirty above for the
+  // switch-away/close case, and the beforeunload handler below for leaving the page).
+  useEffect(() => {
+    if (!isDoc || !canWrite || docMode !== "edit" || docSource === lastSavedSource) return;
+    const t = setTimeout(() => {
+      saveDoc();
+    }, 1200);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [docSource]);
+
+  useEffect(() => {
+    if (!docDirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [docDirty]);
 
   const contentUrl = selected ? `/api/files/content?path=${encodeURIComponent(selected.relPath)}` : "";
 
@@ -740,11 +785,9 @@ export function FilesBrowser({
                       에디터
                     </button>
                   </div>
-                  {docMode === "edit" && (
-                    <span style={{ fontSize: 11.5, color: "var(--ink3)" }}>
-                      {docPending ? "저장 중..." : docSavedAt ? `${docSavedAt} 저장됨` : `최종 수정 ${new Date(selected.mtime).toLocaleString("ko-KR")}`}
-                    </span>
-                  )}
+                  <span style={{ fontSize: 11.5, color: docPending ? "var(--ink3)" : docDirty ? "var(--warn)" : "var(--ink3)" }}>
+                    {docPending ? "저장 중..." : docDirty ? "저장 안 됨" : docSavedAt ? `${docSavedAt} 저장됨` : `최종 수정 ${new Date(selected.mtime).toLocaleString("ko-KR")}`}
+                  </span>
                   {docMode === "edit" && (
                     <button
                       onClick={saveDoc}
@@ -810,7 +853,7 @@ export function FilesBrowser({
                   </button>
                 </>
               )}
-              <button onClick={() => { setSelected(null); setPreview(null); }} style={{ height: 27, width: 27, border: 0, background: "transparent", color: "var(--ink3)", fontSize: 15, cursor: "pointer" }}>
+              <button onClick={async () => { await flushIfDirty(); setSelected(null); setPreview(null); }} style={{ height: 27, width: 27, border: 0, background: "transparent", color: "var(--ink3)", fontSize: 15, cursor: "pointer" }}>
                 ✕
               </button>
             </div>
