@@ -114,3 +114,62 @@ export function diffSideBySide(a: string, b: string): SideRow[] {
 
   return rows;
 }
+
+export type CharDiff = { type: "same" | "del" | "add"; text: string };
+
+// Same O(n*m) LCS cap rationale as diffLines(), but per-character -- a single pasted
+// line is normally well under this, so the (rare) fallback just shows the two whole
+// strings as one removal + one addition instead of char-level detail.
+const MAX_CHAR_LCS_CELLS = 4_000_000;
+
+/** WinMerge-style intra-line diff: given one removed line and one added line that were
+ * paired up as a "modified" row by diffSideBySide, finds exactly which characters differ
+ * so only those can be highlighted instead of the whole line. */
+export function diffChars(a: string, b: string): CharDiff[] {
+  const chA = Array.from(a);
+  const chB = Array.from(b);
+  const n = chA.length;
+  const m = chB.length;
+
+  const raw: CharDiff[] = [];
+
+  if (n * m > MAX_CHAR_LCS_CELLS) {
+    if (a) raw.push({ type: "del", text: a });
+    if (b) raw.push({ type: "add", text: b });
+    return raw;
+  }
+
+  const lcs: number[][] = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      lcs[i][j] = chA[i] === chB[j] ? lcs[i + 1][j + 1] + 1 : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
+    }
+  }
+
+  let i = 0;
+  let j = 0;
+  while (i < n && j < m) {
+    if (chA[i] === chB[j]) {
+      raw.push({ type: "same", text: chA[i] });
+      i++;
+      j++;
+    } else if (lcs[i + 1][j] >= lcs[i][j + 1]) {
+      raw.push({ type: "del", text: chA[i] });
+      i++;
+    } else {
+      raw.push({ type: "add", text: chB[j] });
+      j++;
+    }
+  }
+  while (i < n) raw.push({ type: "del", text: chA[i++] });
+  while (j < m) raw.push({ type: "add", text: chB[j++] });
+
+  // Merge consecutive same-type characters into runs so React renders one span per run.
+  const merged: CharDiff[] = [];
+  for (const seg of raw) {
+    const last = merged[merged.length - 1];
+    if (last && last.type === seg.type) last.text += seg.text;
+    else merged.push({ ...seg });
+  }
+  return merged;
+}
