@@ -302,6 +302,9 @@ select {
   .login-panel-right {
     display: none !important;
   }
+  .textdiff-grid {
+    grid-template-columns: 1fr !important;
+  }
 }
 
 /* Rich editor toolbar: buttons flagged .wiki-toolbar-extra (table/align/image/etc.) are

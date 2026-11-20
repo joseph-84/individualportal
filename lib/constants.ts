@@ -11,6 +11,10 @@ export const PAGES: PageDef[] = [
   { key: "auditlog", label: "감사 로그", icon: "log" },
 ];
 
+// Utility 하위 메뉴 -- 공유 상태 없는 1회성 도구들(텍스트 비교 등). 새 유틸리티를
+// 추가할 때는 이 배열에 항목만 추가하면 사이드바에 자동으로 나타난다.
+export const UTILITY_PAGES: PageDef[] = [{ key: "textdiff", label: "Text Diff", icon: "diff" }];
+
 export const TITLES: Record<string, [string, string]> = {
   dashboard: ["대시보드", "오늘의 업무 현황"],
   todos: ["할일 · 일정", "리스트 / 캘린더"],
@@ -21,6 +25,7 @@ export const TITLES: Record<string, [string, string]> = {
   editor: ["코드 에디터", "스크립트 코드 편집"],
   auditlog: ["감사 로그", "계정·스크립트·파일 변경 이력"],
   settings: ["설정", "외부 서비스 연동"],
+  textdiff: ["Text Diff", "두 텍스트를 줄 단위로 비교"],
 };
 
 export const ICONS: Record<string, string> = {
@@ -32,4 +37,5 @@ export const ICONS: Record<string, string> = {
   auto: "M11 2.5L4.5 11.5H9L8.5 17.5L15.5 8.5H10.6z",
   code: "M7 5.5L3 10l4 4.5M13 5.5L17 10l-4 4.5M11.5 3.5l-3 13",
   log: "M4 3h9l3 3v11a1 1 0 01-1 1H4a1 1 0 01-1-1V4a1 1 0 011-1zM12.5 3v3.5H16M6.5 10.5h7M6.5 13.5h7M6.5 7.5h3",
+  diff: "M3 4h6v12H3zM11 4h6v12h-6zM5 7h2M5 10h2M5 13h1M13 7h2M13 10h1M13 13h2",
 };

@@ -1,11 +1,58 @@
 "use client";
 
 import { useRouter, usePathname } from "next/navigation";
-import { PAGES } from "@/lib/constants";
+import { PAGES, UTILITY_PAGES } from "@/lib/constants";
+import type { PageDef } from "@/lib/types";
 import { pageKeyToPath, pathToPageKey } from "@/lib/routing";
 import { logoutAction } from "@/app/actions/auth";
 import { useMobileNav } from "@/lib/mobile-nav-context";
 import { Icon } from "./Icon";
+
+function NavButton({ page, current, onClick }: { page: PageDef; current: string; onClick: () => void }) {
+  const on = current === page.key;
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        width: "100%",
+        padding: 8,
+        border: 0,
+        borderRadius: 7,
+        background: on ? "var(--accent-soft)" : "transparent",
+        color: on ? "var(--accent)" : "var(--ink2)",
+        fontSize: 13,
+        fontWeight: on ? 600 : 450,
+        cursor: "pointer",
+        textAlign: "left",
+      }}
+    >
+      <span style={{ width: 16, height: 16, flex: "none", display: "grid", placeItems: "center", opacity: on ? 1 : 0.7 }}>
+        <Icon name={page.icon} />
+      </span>
+      <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{page.label}</span>
+    </button>
+  );
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        fontFamily: "var(--font-mono), monospace",
+        fontSize: 10,
+        fontWeight: 600,
+        letterSpacing: ".12em",
+        color: "var(--ink3)",
+        padding: "8px 8px 5px",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
 
 export function Sidebar({ userName }: { userName: string }) {
   const router = useRouter();
@@ -57,47 +104,14 @@ export function Sidebar({ userName }: { userName: string }) {
           ✕
         </button>
       </div>
-      <div
-        style={{
-          fontFamily: "var(--font-mono), monospace",
-          fontSize: 10,
-          fontWeight: 600,
-          letterSpacing: ".12em",
-          color: "var(--ink3)",
-          padding: "8px 8px 5px",
-        }}
-      >
-        WORKSPACE
-      </div>
-      {PAGES.map((p) => {
-        const on = current === p.key;
-        return (
-          <button
-            key={p.key}
-            onClick={() => router.push(pageKeyToPath(p.key))}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              width: "100%",
-              padding: 8,
-              border: 0,
-              borderRadius: 7,
-              background: on ? "var(--accent-soft)" : "transparent",
-              color: on ? "var(--accent)" : "var(--ink2)",
-              fontSize: 13,
-              fontWeight: on ? 600 : 450,
-              cursor: "pointer",
-              textAlign: "left",
-            }}
-          >
-            <span style={{ width: 16, height: 16, flex: "none", display: "grid", placeItems: "center", opacity: on ? 1 : 0.7 }}>
-              <Icon name={p.icon} />
-            </span>
-            <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.label}</span>
-          </button>
-        );
-      })}
+      <SectionLabel>WORKSPACE</SectionLabel>
+      {PAGES.map((p) => (
+        <NavButton key={p.key} page={p} current={current} onClick={() => router.push(pageKeyToPath(p.key))} />
+      ))}
+      <SectionLabel>UTILITY</SectionLabel>
+      {UTILITY_PAGES.map((p) => (
+        <NavButton key={p.key} page={p} current={current} onClick={() => router.push(pageKeyToPath(p.key))} />
+      ))}
       <div
         style={{
           marginTop: "auto",

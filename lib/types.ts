@@ -1,6 +1,16 @@
 export type Theme = "light" | "dark";
 
-export type PageKey = "dashboard" | "todos" | "files" | "favorites" | "notes" | "automation" | "editor" | "auditlog" | "settings";
+export type PageKey =
+  | "dashboard"
+  | "todos"
+  | "files"
+  | "favorites"
+  | "notes"
+  | "automation"
+  | "editor"
+  | "auditlog"
+  | "settings"
+  | "textdiff";
 
 export interface PageDef {
   key: PageKey;
