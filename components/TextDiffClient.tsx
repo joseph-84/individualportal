@@ -1,11 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { diffLines, diffStats, type DiffLine } from "@/lib/text-diff";
+import { diffSideBySide, type SideCell } from "@/lib/text-diff";
 
 const AREA_STYLE: React.CSSProperties = {
   width: "100%",
-  minHeight: 220,
+  minHeight: 160,
   padding: 10,
   background: "var(--panel2)",
   color: "var(--ink)",
@@ -17,24 +17,69 @@ const AREA_STYLE: React.CSSProperties = {
   resize: "vertical",
 };
 
-const LINE_BG: Record<DiffLine["type"], string> = {
+const RED = "#e03131";
+const GREEN = "#2f9e44";
+
+const CELL_BG: Record<SideCell["type"], string> = {
   same: "transparent",
-  add: "color-mix(in srgb, #2f9e44 18%, transparent)",
-  del: "color-mix(in srgb, #e03131 18%, transparent)",
+  del: "color-mix(in srgb, " + RED + " 12%, transparent)",
+  add: "color-mix(in srgb, " + GREEN + " 12%, transparent)",
+  pad: "repeating-linear-gradient(45deg, var(--line2) 0 5px, transparent 5px 10px)",
 };
 
-const LINE_MARK: Record<DiffLine["type"], string> = { same: " ", add: "+", del: "-" };
+function Cell({ cell, side }: { cell: SideCell; side: "left" | "right" }) {
+  return (
+    <>
+      <div
+        style={{
+          flex: "none",
+          width: 36,
+          textAlign: "center",
+          padding: "1px 0",
+          color: "var(--ink3)",
+          fontSize: 11,
+          userSelect: "none",
+          background: cell.type === "del" || cell.type === "add" ? CELL_BG[cell.type] : "transparent",
+        }}
+      >
+        {cell.num ?? ""}
+      </div>
+      <div
+        style={{
+          flex: 1,
+          minWidth: 0,
+          padding: "1px 10px 1px 6px",
+          whiteSpace: "pre-wrap",
+          wordBreak: "break-word",
+          background: CELL_BG[cell.type],
+          textDecoration: cell.type === "del" ? "line-through" : cell.type === "add" ? "underline" : "none",
+          textDecorationColor: cell.type === "del" ? RED : cell.type === "add" ? GREEN : undefined,
+        }}
+      >
+        {cell.text ?? " "}
+      </div>
+      {side === "left" && <div style={{ flex: "none", width: 1, background: "var(--line)" }} />}
+    </>
+  );
+}
+
+function copy(text: string) {
+  navigator.clipboard?.writeText(text).catch(() => {});
+}
 
 export function TextDiffClient() {
   const [a, setA] = useState("");
   const [b, setB] = useState("");
   const [showDiff, setShowDiff] = useState(false);
 
-  const lines = useMemo(() => diffLines(a, b), [a, b]);
-  const stats = useMemo(() => diffStats(lines), [lines]);
+  const rows = useMemo(() => diffSideBySide(a, b), [a, b]);
+  const removals = useMemo(() => rows.filter((r) => r.left.type === "del").length, [rows]);
+  const additions = useMemo(() => rows.filter((r) => r.right.type === "add").length, [rows]);
+  const leftLines = a === "" ? 0 : a.split("\n").length;
+  const rightLines = b === "" ? 0 : b.split("\n").length;
 
   return (
-    <div style={{ display: "grid", gap: 14, maxWidth: 1100 }}>
+    <div style={{ display: "grid", gap: 14 }}>
       <div className="textdiff-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
         <div style={{ display: "grid", gap: 6 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: "var(--ink2)" }}>원본</div>
@@ -91,28 +136,57 @@ export function TextDiffClient() {
         >
           초기화
         </button>
-        {showDiff && (
-          <div style={{ fontSize: 12, color: "var(--ink3)" }}>
-            <span style={{ color: "#2f9e44", fontWeight: 600 }}>+{stats.added}</span>{" "}
-            <span style={{ color: "#e03131", fontWeight: 600 }}>-{stats.removed}</span>
-          </div>
-        )}
+        <button
+          onClick={() => {
+            setA(b);
+            setB(a);
+          }}
+          title="원본/변경본 바꾸기"
+          style={{ height: 32, width: 32, border: "1px solid var(--line)", borderRadius: 7, background: "var(--panel2)", color: "var(--ink2)", fontSize: 14, cursor: "pointer" }}
+        >
+          ⇄
+        </button>
       </div>
 
       {showDiff && (
-        <div style={{ border: "1px solid var(--line)", borderRadius: 7, overflow: "hidden" }}>
-          {lines.length === 0 ? (
-            <div style={{ padding: 14, fontSize: 12.5, color: "var(--ink3)" }}>두 텍스트가 모두 비어 있습니다.</div>
-          ) : (
-            <pre style={{ margin: 0, maxHeight: 480, overflow: "auto", fontFamily: "var(--font-mono), monospace", fontSize: 12, lineHeight: 1.6 }}>
-              {lines.map((l, i) => (
-                <div key={i} style={{ display: "flex", background: LINE_BG[l.type] }}>
-                  <span style={{ flex: "none", width: 22, textAlign: "center", color: "var(--ink3)", userSelect: "none" }}>{LINE_MARK[l.type]}</span>
-                  <span style={{ whiteSpace: "pre-wrap", flex: 1 }}>{l.text.length ? l.text : " "}</span>
+        <div style={{ border: "1px solid var(--line)", borderRadius: 8, overflow: "hidden", background: "var(--panel)" }}>
+          <div style={{ display: "flex", alignItems: "center" }}>
+            <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "10px 12px" }}>
+              <span style={{ color: RED, fontSize: 15, lineHeight: 1 }}>⊖</span>
+              <span style={{ fontSize: 12.5, fontWeight: 600, color: RED }}>{removals} removals</span>
+              <span style={{ marginLeft: "auto", fontSize: 11.5, color: "var(--ink3)" }}>{leftLines} lines</span>
+              <button
+                onClick={() => copy(a)}
+                style={{ border: 0, background: "transparent", color: "var(--ink3)", fontSize: 11.5, cursor: "pointer", textDecoration: "underline" }}
+              >
+                Copy
+              </button>
+            </div>
+            <div style={{ flex: "none", width: 1, alignSelf: "stretch", background: "var(--line)" }} />
+            <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "10px 12px" }}>
+              <span style={{ color: GREEN, fontSize: 15, lineHeight: 1 }}>⊕</span>
+              <span style={{ fontSize: 12.5, fontWeight: 600, color: GREEN }}>{additions} additions</span>
+              <span style={{ marginLeft: "auto", fontSize: 11.5, color: "var(--ink3)" }}>{rightLines} lines</span>
+              <button
+                onClick={() => copy(b)}
+                style={{ border: 0, background: "transparent", color: "var(--ink3)", fontSize: 11.5, cursor: "pointer", textDecoration: "underline" }}
+              >
+                Copy
+              </button>
+            </div>
+          </div>
+          <div style={{ borderTop: "1px solid var(--line)", maxHeight: 520, overflow: "auto", fontFamily: "var(--font-mono), monospace", fontSize: 12, lineHeight: 1.6 }}>
+            {rows.length === 0 ? (
+              <div style={{ padding: 14, fontSize: 12.5, color: "var(--ink3)" }}>두 텍스트가 모두 비어 있습니다.</div>
+            ) : (
+              rows.map((r, i) => (
+                <div key={i} style={{ display: "flex" }}>
+                  <Cell cell={r.left} side="left" />
+                  <Cell cell={r.right} side="right" />
                 </div>
-              ))}
-            </pre>
-          )}
+              ))
+            )}
+          </div>
         </div>
       )}
     </div>

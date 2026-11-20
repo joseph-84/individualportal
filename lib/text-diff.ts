@@ -66,3 +66,51 @@ export function diffStats(lines: DiffLine[]): { added: number; removed: number }
   }
   return { added, removed };
 }
+
+export type SideCell = { num: number | null; text: string | null; type: "same" | "del" | "add" | "pad" };
+export type SideRow = { left: SideCell; right: SideCell };
+
+/** Re-groups the flat diffLines() sequence into diffchecker-style side-by-side rows:
+ * unchanged lines stay aligned on both sides, and a run of consecutive removals/additions
+ * between two unchanged lines is paired up index-by-index, padding the shorter side with a
+ * blank "pad" cell so both panes keep the same row count (and so later unchanged lines still
+ * line up on the same row). */
+export function diffSideBySide(a: string, b: string): SideRow[] {
+  const flat = diffLines(a, b);
+  const rows: SideRow[] = [];
+  let leftNum = 0;
+  let rightNum = 0;
+  let dels: string[] = [];
+  let adds: string[] = [];
+
+  const flushBlock = () => {
+    const max = Math.max(dels.length, adds.length);
+    for (let i = 0; i < max; i++) {
+      const delText = i < dels.length ? dels[i] : null;
+      const addText = i < adds.length ? adds[i] : null;
+      rows.push({
+        left: delText !== null ? { num: ++leftNum, text: delText, type: "del" } : { num: null, text: null, type: "pad" },
+        right: addText !== null ? { num: ++rightNum, text: addText, type: "add" } : { num: null, text: null, type: "pad" },
+      });
+    }
+    dels = [];
+    adds = [];
+  };
+
+  for (const line of flat) {
+    if (line.type === "same") {
+      flushBlock();
+      rows.push({
+        left: { num: ++leftNum, text: line.text, type: "same" },
+        right: { num: ++rightNum, text: line.text, type: "same" },
+      });
+    } else if (line.type === "del") {
+      dels.push(line.text);
+    } else {
+      adds.push(line.text);
+    }
+  }
+  flushBlock();
+
+  return rows;
+}
