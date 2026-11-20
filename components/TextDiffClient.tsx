@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { diffSideBySide, type SideCell } from "@/lib/text-diff";
+import { diffSideBySide, diffChars, type SideCell, type SideRow, type CharDiff } from "@/lib/text-diff";
 
 const AREA_STYLE: React.CSSProperties = {
   width: "100%",
@@ -27,7 +27,30 @@ const CELL_BG: Record<SideCell["type"], string> = {
   pad: "repeating-linear-gradient(45deg, var(--line2) 0 5px, transparent 5px 10px)",
 };
 
-function Cell({ cell, side }: { cell: SideCell; side: "left" | "right" }) {
+const CHAR_HIGHLIGHT: Record<"del" | "add", React.CSSProperties> = {
+  del: { background: "color-mix(in srgb, " + RED + " 38%, transparent)", borderRadius: 2 },
+  add: { background: "color-mix(in srgb, " + GREEN + " 38%, transparent)", borderRadius: 2 },
+};
+
+/** Renders one side of a WinMerge-style intra-line diff: unchanged characters plain,
+ * only the side's own changed runs (del on the left, add on the right) highlighted --
+ * the other side's runs are skipped so each pane shows just its own version of the line. */
+function CharDiffText({ segs, side }: { segs: CharDiff[]; side: "del" | "add" }) {
+  return (
+    <>
+      {segs
+        .filter((s) => s.type === "same" || s.type === side)
+        .map((s, idx) => (
+          <span key={idx} style={s.type === "same" ? undefined : CHAR_HIGHLIGHT[side]}>
+            {s.text}
+          </span>
+        ))}
+    </>
+  );
+}
+
+function Cell({ cell, side, charSegs }: { cell: SideCell; side: "left" | "right"; charSegs: CharDiff[] | null }) {
+  const kind: "del" | "add" = side === "left" ? "del" : "add";
   return (
     <>
       <div
@@ -52,14 +75,30 @@ function Cell({ cell, side }: { cell: SideCell; side: "left" | "right" }) {
           whiteSpace: "pre-wrap",
           wordBreak: "break-word",
           background: CELL_BG[cell.type],
-          textDecoration: cell.type === "del" ? "line-through" : cell.type === "add" ? "underline" : "none",
+          textDecoration: !charSegs && cell.type === "del" ? "line-through" : !charSegs && cell.type === "add" ? "underline" : "none",
           textDecorationColor: cell.type === "del" ? RED : cell.type === "add" ? GREEN : undefined,
         }}
       >
-        {cell.text ?? " "}
+        {charSegs ? <CharDiffText segs={charSegs} side={kind} /> : (cell.text ?? " ")}
       </div>
       {side === "left" && <div style={{ flex: "none", width: 1, background: "var(--line)" }} />}
     </>
+  );
+}
+
+/** A row counts as a "modified line" (both a removal and an addition landed on the same
+ * aligned row, rather than a pure insert/delete with a blank pad on the other side) exactly
+ * when diffSideBySide paired a del with an add -- that's the only case char-level
+ * highlighting makes sense for, since otherwise there's no counterpart line to diff against. */
+function Row({ row }: { row: SideRow }) {
+  const isModified = row.left.type === "del" && row.right.type === "add";
+  const charSegs = useMemo(() => (isModified ? diffChars(row.left.text!, row.right.text!) : null), [isModified, row.left.text, row.right.text]);
+
+  return (
+    <div style={{ display: "flex" }}>
+      <Cell cell={row.left} side="left" charSegs={charSegs} />
+      <Cell cell={row.right} side="right" charSegs={charSegs} />
+    </div>
   );
 }
 
@@ -179,12 +218,7 @@ export function TextDiffClient() {
             {rows.length === 0 ? (
               <div style={{ padding: 14, fontSize: 12.5, color: "var(--ink3)" }}>두 텍스트가 모두 비어 있습니다.</div>
             ) : (
-              rows.map((r, i) => (
-                <div key={i} style={{ display: "flex" }}>
-                  <Cell cell={r.left} side="left" />
-                  <Cell cell={r.right} side="right" />
-                </div>
-              ))
+              rows.map((r, i) => <Row key={i} row={r} />)
             )}
           </div>
         </div>
